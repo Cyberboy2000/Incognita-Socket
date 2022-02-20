@@ -256,7 +256,7 @@ local function onClickCancel( self )
 	statemgr.activate( stateGenerationOptions(), self._diff, self._campaignOptions )
 end
 
-local function toMainMenu()
+local function toMainMenu( self )
 	MOAIFmodDesigner.playSound( cdefs.SOUND_HUD_GAME_WOOSHOUT )
 	
 	statemgr.deactivate( self )
@@ -321,7 +321,7 @@ function stateSetupMultiplayer:onLoad( campaign, difficulty, params )
 	if campaign then
 		-- Resuming an existing game is host-only.
 		onClickHost( self )
-		self.screen.binder.configPanel.binder.backToModeBtn.binder.btn.onClick = util.makeDelegate(nil, toMainMenu)
+		self.screen.binder.configPanel.binder.backToModeBtn.binder.btn.onClick = util.makeDelegate(nil, toMainMenu, self)
 	end
 end
 

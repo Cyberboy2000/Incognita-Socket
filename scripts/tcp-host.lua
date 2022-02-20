@@ -70,11 +70,18 @@ function tcpHost:prepareConnection()
 				ok, err = ipTestClient:connect("www.google.com", 80)
 				
 				if ok then
+					--local line, receiveErr, partial = ipTestClient:receive()
+					--if multiMod.VERBOSE then
+						--log:write(string.format("Connection test returned (%s, %s, %s)", tostring(line), tostring(receiveErr), tostring(partial)))
+					--end
+					
 					local ip, port = ipTestClient:getsockname()
 					ipTestClient:close()
 
 					log:write("This IP "..ip)
 					self.ip = ip
+				elseif multiMod.VERBOSE then
+					log:write("Failed connection test: "..err)
 				end
 			end
 		end

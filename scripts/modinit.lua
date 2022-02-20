@@ -27,7 +27,6 @@ local function init( modApi )
 	multiMod.host = include(scriptPath.."/tcp-host")
 	multiMod.client = include(scriptPath.."/tcp-client")
 	multiMod.stateSetup = include(scriptPath.."/state-setup-multiplayer")
-	include(scriptPath.."/simdefs")
 	include(scriptPath.."/mui_text")
 	include(scriptPath.."/state-game")
 	include(scriptPath.."/state-loading")
@@ -38,6 +37,12 @@ end
 
 local function load( modApi, options, params )
 	multiMod.params = nil
+	
+	local scriptPath = modApi:getScriptPath()
+	modApi:addNewUIScreen( "modal-setup-multiplayer", scriptPath.."/modal-setup-multiplayer" )
+	modApi:insertUIElements( include( scriptPath.."/screen_inserts" ) )
+	modApi:modifyUIElements( include( scriptPath.."/screen_modifications" ) )
+	
 	if options["multiMod"] and options["multiMod"].enabled and params then
 		multiMod.params = params
 		params.exitfunction = function(stateGenerationOptions)

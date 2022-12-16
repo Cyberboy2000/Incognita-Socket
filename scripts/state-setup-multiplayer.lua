@@ -48,14 +48,14 @@ local stateConnecting = {
 	end
 }
 
-local function onClickOk( self )
-	if self.isHosting then
+local function launchHost( self )
 		-- Signal the server to start listening to clients, then launch the multiplayer campaign.
 		local campaign = self._campaign
 		local diff = self._diff
 		local options = self._campaignOptions
+		local port = tonumber(self.screen.binder.configPanel.binder.port:getText())
 		
-		statemgr.activate( multiMod, self.host, self.screen.binder.configPanel.binder.pw:getText() )
+		statemgr.activate( multiMod, self.host, port, self.screen.binder.configPanel.binder.pw:getText() )
 		statemgr.deactivate( self )
 		if campaign then
 			-- We are resuming an existing campaign.
@@ -78,7 +78,9 @@ local function onClickOk( self )
 			
 			statemgr.activate( stateTeamPreview( diff, options ) )
 		end
-	else
+end
+
+local function launchClient( self )
 		local client = multiMod.client
 		local ip = self.screen.binder.configPanel.binder.ipAdress:getText()
 		local port = tonumber(self.screen.binder.configPanel.binder.port:getText())
@@ -132,6 +134,13 @@ local function onClickOk( self )
 		if statemgr.isActive( multiMod ) then
 			statemgr.deactivate( multiMod )
 		end
+end
+
+local function onClickOk( self )
+	if self.isHosting then
+		launchHost( self )
+	else
+		launchClient( self )
 	end
 end
 
@@ -169,9 +178,9 @@ local function onClickHost( self )
 	end
 	
 	self.screen.binder.configPanel.binder.ipAdress:setDisabled(true)
-	self.screen.binder.configPanel.binder.port:setDisabled(true)
+	--self.screen.binder.configPanel.binder.port:setDisabled(true)
 	self.screen.binder.configPanel.binder.ipAdress._cont._isDisabled = true
-	self.screen.binder.configPanel.binder.port._cont._isDisabled = true
+	--self.screen.binder.configPanel.binder.port._cont._isDisabled = true
 	self.screen.binder.configPanel.binder.pw:setPasswordChar("*")
 	self.screen.binder.configPanel.binder.okBtn.binder.btn:setDisabled(false)
 	
@@ -182,7 +191,7 @@ local function onClickHost( self )
 		-- This creates the server object, but doesn't tell it to start listening to clients yet.
 		-- This allows us to retrieve information such as port.
 		local host = multiMod.host
-		local err = host:prepareConnection()
+		local ip, err = host:prepareConnection()
 	
 		if err then
 			self.screen.binder.headerTxt2:spoolText("ERROR: "..tostring(err))

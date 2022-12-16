@@ -13,6 +13,7 @@ local array = include( "modules/array" )
 local tcpSelect = multiMod.socketCore.select
 
 local tcpHost = {
+	clientIndex = 0,
 	clients = {},
 	set = {}
 }
@@ -21,25 +22,15 @@ local tcpHost = {
 --   Set up a TCP server and read messages from the clients   --
 ----------------------------------------------------------------
 
-function tcpHost:onLoad( receiver, password )
+function tcpHost:onLoad( receiver, port, password )
 	assert(receiver)
 	assert(type(receiver.receiveData) == "function")
 	assert(self.receiver == nil)
 	assert(receiver:getUplink(  ) == self)
 	
-	self.err = nil
-	self:prepareConnection()
-	if self.server then
-		self.receiver = receiver
-		local ok, err = self.server:listen()
-		self.password = password
-		self.hasPassword = type(password) == "string" and string.len(password) > 0
-		self.err = err
-		
-		if err then
-			log:write("Failed to start up server object: "..err)
-		end
-	end
+	self:getIP( receiver, port, password )
+	self.err = self:createServer( receiver, port, password )
+	self:startListen( receiver, port, password )
 end
 
 ----------------------------------------------------------------
@@ -61,31 +52,40 @@ end
 
 ----------------------------------------------------------------
 
-function tcpHost:prepareConnection()
-	if not self.server then
-		if not self.ip then
-			local ipTestClient, err, ok = multiMod.socketCore.tcp()
-			if ipTestClient then
-				ipTestClient:settimeout(1)
-				ok, err = ipTestClient:connect("www.google.com", 80)
+function tcpHost:getIP( receiver, port, password )
+	if self.ip then
+		return self.ip
+	else
+		local ipTestClient, err, ok = multiMod.socketCore.tcp()
+		if ipTestClient then
+			ipTestClient:settimeout(1)
+			ok, err = ipTestClient:connect("www.google.com", 80)
+			
+			if ok then
+				--local line, receiveErr, partial = ipTestClient:receive()
+				--if multiMod.VERBOSE then
+					--log:write(string.format("Connection test returned (%s, %s, %s)", tostring(line), tostring(receiveErr), tostring(partial)))
+				--end
 				
-				if ok then
-					--local line, receiveErr, partial = ipTestClient:receive()
-					--if multiMod.VERBOSE then
-						--log:write(string.format("Connection test returned (%s, %s, %s)", tostring(line), tostring(receiveErr), tostring(partial)))
-					--end
-					
-					local ip, port = ipTestClient:getsockname()
-					ipTestClient:close()
+				local ip, port = ipTestClient:getsockname()
+				ipTestClient:close()
 
-					log:write("This IP "..ip)
-					self.ip = ip
-				elseif multiMod.VERBOSE then
-					log:write("Failed connection test: "..err)
-				end
+				log:write("This IP "..ip)
+				self.ip = ip
+				return ip
+			elseif multiMod.VERBOSE then
+				log:write("Failed connection test: "..err)
 			end
+			
+			return nil, err
+		else
+			return nil, err
 		end
+	end
+end
 
+function tcpHost:createServer( receiver, port, password )
+	if not self.server then
 		-- Create a TCP socket and bind it to the local host, at any port.
 		local server, tcpErr, ok = multiMod.socketCore.tcp()
 		
@@ -94,7 +94,7 @@ function tcpHost:prepareConnection()
 			server:settimeout(0)
 			server:setoption("reuseaddr", true)
 			--ok, tcpErr = server:bind(self.ip or "*", multiMod.DEFAULT_PORT)
-			ok, tcpErr = server:bind("*", multiMod.DEFAULT_PORT)
+			ok, tcpErr = server:bind("*", port or multiMod.DEFAULT_PORT)
 			if ok then
 				-- Find out which port the OS chose for us.
 				local ip, port = server:getsockname()
@@ -114,13 +114,39 @@ function tcpHost:prepareConnection()
 	end
 end
 
+function tcpHost:startListen( receiver, port, password )
+	if self.server then
+		self.receiver = receiver
+		local ok, err = self.server:listen()
+		self.password = password
+		self.hasPassword = type(password) == "string" and string.len(password) > 0
+		self.err = err
+		
+		if err then
+			log:write("Failed to start up server object: "..err)
+		end
+	end
+end
+
+function tcpHost:prepareConnection()
+	return self:getIP()
+end
+
 local function shutdownClient( self, client, err, message )
 	local clientIp, clientPort = client.tcp:getpeername()
+	message = string.format(message,tostring(clientIp),tostring(clientPort),tostring(err))
+	log:write(message)
+	
 	self.clients[client.tcp] = nil
 	array.removeElement( self.set, client.tcp )
 	client.tcp:close()
 	client.tcp = nil
-	log:write(string.format(message,tostring(clientIp),tostring(clientPort),tostring(err)))
+	
+	for i = client.clientIndex, #self.set do
+		self.set[i].clientIndex = self.set[i].clientIndex - 1
+	end
+	
+	self.receiver:onClientDisconnect( client, message )
 end
 
 ----------------------------------------------------------------
@@ -140,7 +166,8 @@ function tcpHost:onUpdate(  )
 				local client = {
 					tcp = clientTcp,
 					receivingBuffer = "",
-					sendingBuffer = ""
+					sendingBuffer = "",
+					clientIndex = #self.set + 1
 				}
 				
 				if not self.hasPassword then
@@ -163,11 +190,17 @@ function tcpHost:onUpdate(  )
 			if err == "timeout" then
 				-- We received only a partial result due to timeout, buffer it.
 				client.receivingBuffer = client.receivingBuffer..partial
-				log:write("Partial "..tostring(partial))
+				
+				if multiMod.VERBOSE then
+					log:write("Received "..tostring(line))
+				end
 			elseif err then
 				shutdownClient( self, client, err, err == "closed" and "client at %s on port %s was disconnected" or "client:receive from client at %s on port %s returned: %s" )
 			else
-				log:write("Received "..tostring(line))
+				if multiMod.VERBOSE then
+					log:write("Received "..tostring(line))
+				end
+				
 				-- The stream of data reached a newline.
 				-- Combine it with the buffered data.
 				local fullLine = client.receivingBuffer..line

@@ -12,7 +12,7 @@ local function init( modApi )
 	
 	modApi:addGenerationOption("multiMod",STRINGS.MULTI_MOD.NAME,STRINGS.MULTI_MOD.TIP,{noUpdate=true})
 	
-	log:write("MULTIMODINIT")
+	log:write("MULTIMOD INIT")
 	MOAIFileSystem.copy( dataPath.."/lua5.1.dll", "lua5.1.dll" )
 	package.cpath = package.cpath..";"..dataPath.."/?.dll;"
 	
@@ -22,6 +22,7 @@ local function init( modApi )
 	multiMod.MULTI_MOD_VERSION = 1
 	multiMod.COMPABILITY_VERSION = 1
 	multiMod.VERBOSE = true
+	log:write("MULTIMOD VERSION "..tostring(multiMod.MULTI_MOD_VERSION))
 	multiMod.socketCore = include( "socket.core" )
 	multiMod.serializer = include(scriptPath.."/serializer")
 	multiMod.host = include(scriptPath.."/tcp-host")
@@ -33,6 +34,8 @@ local function init( modApi )
 	include(scriptPath.."/state-team-preview")
 	include(scriptPath.."/engine")
 	include(scriptPath.."/saveslots-dialog")
+	include( scriptPath.."/state-map-screen" )
+	include( scriptPath.."/state-upgrade-screen" )
 end
 
 local function load( modApi, options, params )

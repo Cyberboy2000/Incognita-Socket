@@ -21,13 +21,18 @@ local function init( modApi )
 	multiMod.DEFAULT_PORT = 27017
 	multiMod.MULTI_MOD_VERSION = 1
 	multiMod.COMPABILITY_VERSION = 1
+	multiMod.WERP_ADRESS = "localhost"
+	multiMod.WERP_PORT = 27017
 	multiMod.VERBOSE = true
 	log:write("MULTIMOD VERSION "..tostring(multiMod.MULTI_MOD_VERSION))
 	multiMod.socketCore = include( "socket.core" )
 	multiMod.serializer = include(scriptPath.."/serializer")
 	multiMod.host = include(scriptPath.."/tcp-host")
 	multiMod.client = include(scriptPath.."/tcp-client")
+	--multiMod.werpHost = include(scriptPath.."/tcp-werp-host")
+	multiMod.werpClient = include(scriptPath.."/tcp-werp-client")
 	multiMod.stateSetup = include(scriptPath.."/state-setup-multiplayer")
+	multiMod.stateSetupWerp = include(scriptPath.."/state-setup-werp")
 	include(scriptPath.."/mui_text")
 	include(scriptPath.."/state-game")
 	include(scriptPath.."/state-loading")
@@ -49,7 +54,7 @@ local function load( modApi, options, params )
 	if options["multiMod"] and options["multiMod"].enabled and params then
 		multiMod.params = params
 		params.exitfunction = function(stateGenerationOptions)
-			statemgr.activate( multiMod.stateSetup, nil, stateGenerationOptions._diff, multiMod.params )
+			statemgr.activate( multiMod.stateSetupWerp, nil, stateGenerationOptions._diff, multiMod.params )
 		end
 	end
 end

@@ -7,7 +7,7 @@ local cdefs = include( "client_defs" )
 local modalDialog = include( "states/state-modal-dialog" )
 local cheatmenu = include( "fe/cheatmenu" )
 local simactions = include("sim/simactions")
-local serializer = include( "modules/serialize" )
+local array = include( "modules/array" )
 
 local tcpClient = {}
 
@@ -42,8 +42,6 @@ function tcpClient:onLoad( receiver, address, port, password )
 		ok, err = tcp:connect(address, port)
 		self.receiver = receiver
 		self.connected = ok
-		local er = self:send( {pw=password or ""} )
-		err = err or er
 		
 		local localAddress, localPort = tcp:getsockname()
 		local peerAddress, peerPort = tcp:getpeername()
@@ -90,28 +88,13 @@ function tcpClient:onUpdate(  )
 				-- Unhandled error: Shutdown.
 				log:write("tcp:receive for client failed: "..err)
 				self:onError(err,true)
-				statemgr.deactivate(self.receiver)
 			else
 				-- The stream of data reached a newline.
 				-- Combine it with the buffered data.
 				local fullLine = self.receivingBuffer..line
 				self.receivingBuffer = ""
 				
-				if multiMod.VERBOSE then
-					log:write("Received "..tostring(fullLine))
-				end
-				
-				local data = multiMod.serializer.deserializeAction(fullLine)
-				-- Check if the password was accepted.
-				if type(data) == "table" then
-					if data.pwA then
-						self.passwordAccepted = true
-					elseif data.pwR then
-						self.passwordRejected = true
-					end
-				end
-				-- Pass the received data along to the game logic.
-				self.receiver:receiveData(nil,data,fullLine)
+				self:receiveLine(fullLine)
 			end
 		end
 		
@@ -141,14 +124,35 @@ function tcpClient:onUpdate(  )
 				log:write("Peer name "..tostring(peerAddress).." : "..tostring(peerPort))
 			else
 				log:write("tcp:connect for client failed: "..err)
-				self:onError(err)
+				self:onError(err,true)
 			end
 		end
 	end
 end
 
+function tcpClient:receiveLine(fullLine)
+	if multiMod.VERBOSE then
+		log:write("Received "..tostring(fullLine))
+	end
+	
+	local data, err = multiMod.serializer.deserializeAction(fullLine)
+	-- Check if the password was accepted.
+	if type(data) == "table" then
+		if data.pwA then
+			self.passwordAccepted = true
+		elseif data.pwR then
+			self.passwordRejected = true
+		end
+	end
+	-- Pass the received data along to the game logic.
+	self.receiver:receiveData(nil,data,fullLine)
+end
+
 function tcpClient:onError( err, isTcpError )
 	self.err = err
+	if isTcpError then
+		self.receiver:onConnectionError(err)
+	end
 end
 
 function tcpClient:send( data )

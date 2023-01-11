@@ -7,13 +7,13 @@ local cdefs = include( "client_defs" )
 local modalDialog = include( "states/state-modal-dialog" )
 local cheatmenu = include( "fe/cheatmenu" )
 local simactions = include("sim/simactions")
-local serializer = include( "modules/serialize" )
 local array = include( "modules/array" )
 
 local tcpSelect = multiMod.socketCore.select
 
 local tcpHost = {
 	clientIndex = 0,
+	nextClientIndex = 1,
 	clients = {},
 	set = {}
 }
@@ -40,6 +40,8 @@ function tcpHost:onUnload(  )
 	for k, client in pairs(self.clients) do
 		client.tcp:close()
 	end
+	
+	self.nextClientIndex = 1
 	self.clients = {}
 	self.set = {}
 	
@@ -132,7 +134,7 @@ function tcpHost:prepareConnection()
 	return self:getIP()
 end
 
-local function shutdownClient( self, client, err, message )
+function tcpHost:shutdownClient( client, err, message )
 	local clientIp, clientPort = client.tcp:getpeername()
 	message = string.format(message,tostring(clientIp),tostring(clientPort),tostring(err))
 	log:write(message)
@@ -141,10 +143,6 @@ local function shutdownClient( self, client, err, message )
 	array.removeElement( self.set, client.tcp )
 	client.tcp:close()
 	client.tcp = nil
-	
-	for i = client.clientIndex, #self.set do
-		self.set[i].clientIndex = self.set[i].clientIndex - 1
-	end
 	
 	self.receiver:onClientDisconnect( client, message )
 end
@@ -167,9 +165,10 @@ function tcpHost:onUpdate(  )
 					tcp = clientTcp,
 					receivingBuffer = "",
 					sendingBuffer = "",
-					clientIndex = #self.set + 1
+					clientIndex = self.nextClientIndex
 				}
 				
+				self.nextClientIndex = self.nextClientIndex + 1
 				if not self.hasPassword then
 					--client.sendingBuffer = multiMod.serializer.serializeAction({pwA=true}).."\n"
 				end
@@ -195,7 +194,7 @@ function tcpHost:onUpdate(  )
 					log:write("Received "..tostring(line))
 				end
 			elseif err then
-				shutdownClient( self, client, err, err == "closed" and "client at %s on port %s was disconnected" or "client:receive from client at %s on port %s returned: %s" )
+				self:shutdownClient( client, err, err == "closed" and "client at %s on port %s was disconnected" or "client:receive from client at %s on port %s returned: %s" )
 			else
 				if multiMod.VERBOSE then
 					log:write("Received "..tostring(line))
@@ -205,28 +204,7 @@ function tcpHost:onUpdate(  )
 				-- Combine it with the buffered data.
 				local fullLine = client.receivingBuffer..line
 				client.receivingBuffer = ""
-			
-				local data, err = multiMod.serializer.deserializeAction(fullLine)
-				
-				-- Note, even if we're not using a password, the client may be waiting for us to check their password and send a response.
-				if client.hasPassword then
-					-- Pass the received information to the receiver. They will then handle the game logic.
-					self.receiver:receiveData(client,data,fullLine)
-				elseif type(data) == "table" and data.pw then
-					if not self.hasPassword or data.pw == self.password then
-						-- Client sent us the correct password.
-						client.hasPassword = true
-						
-						-- Respond to the client with a confirmation, plus the current campaign information.
-						self:sendTo( self.receiver:mergeCampaign( {pwA = true} ), client )
-						
-						-- Finally, pass the information onto the receiver.
-						self.receiver:receiveData(client,data,fullLine)
-					else
-						-- That's the wrong password. Send a rejection message.
-						client.sendingBuffer = client.sendingBuffer .. multiMod.serializer.serializeAction({pwR=true}) .. "\n"
-					end
-				end
+				self:receiveLine( client, fullLine )
 			end
 		end
 		
@@ -238,19 +216,51 @@ function tcpHost:onUpdate(  )
 				client.sendingBuffer = string.sub( client.sendingBuffer, (bytesSent or errBytesSent) + 1 )
 				--log:write("Send "..tostring(bytesSent or errBytesSent))
 				if err and err ~= "timeout" then
-					shutdownClient( self, client, err, err == "closed" and "client at %s on port %s was disconnected" or "client:send from client at %s on port %s returned: %s" )
+					self:shutdownClient( client, err, err == "closed" and "client at %s on port %s was disconnected" or "client:send from client at %s on port %s returned: %s" )
 				end
 			end
 		end
 	end
 end
 
-function tcpHost:send( data )
+function tcpHost:receiveLine( client, fullLine )
+	local data, err = multiMod.serializer.deserializeAction(fullLine)
+	
+	-- Note, even if we're not using a password, the client may be waiting for us to check their password and send a response.
+	if client.hasPassword then
+		-- Pass the received information to the receiver. They will then handle the game logic.
+		self.receiver:receiveData(client,data,fullLine)
+	elseif type(data) == "table" and data.pw then
+		if not self.hasPassword or data.pw == self.password then
+			-- Client sent us the correct password.
+			client.hasPassword = true
+			
+			-- Respond to the client with a confirmation, plus the current campaign information.
+			self:sendTo( self.receiver:mergeCampaign( {pwA = true} ), client )
+			
+			-- Finally, pass the information onto the receiver.
+			self.receiver:receiveData(client,data,fullLine)
+		else
+			-- That's the wrong password. Send a rejection message.
+			self:sendTo( self.receiver:mergeCampaign( {pwR = true} ), client, true )
+		end
+	end
+end
+
+function tcpHost:serializeData( data, rawLine )
+	if rawLine then
+		return data
+	else
+		return multiMod.serializer.serializeAction( data )
+	end
+end
+
+function tcpHost:send( data, targetClient, excludeClient, noPassword, rawLine )
 	if not self.receiver then
 		return "Server Not Running"
 	end
 
-	local line, err = multiMod.serializer.serializeAction( data )
+	local line, err = self:serializeData( data, rawLine )
 	
 	if line then
 		if multiMod.VERBOSE then
@@ -258,30 +268,8 @@ function tcpHost:send( data )
 		end
 	
 		for k, client in pairs(self.clients) do
-			if client.hasPassword then
-				client.sendingBuffer = client.sendingBuffer .. line .. "\n"
-			end
-		end
-	end
-	
-	return err
-end
-
-function tcpHost:sendTo( data, toClient )
-	if not self.receiver then
-		return "Server Not Running"
-	end
-
-	local line, err = multiMod.serializer.serializeAction( data )
-	
-	if line then
-		if multiMod.VERBOSE then
-			log:write("Host, sending "..line.." to "..toClient)
-		end
-		
-		for k, client in pairs(self.clients) do
-			if toClient == client then
-				if client.hasPassword then
+			if client == targetClient or targetClient == nil and client ~= excludeClient then
+				if client.hasPassword or noPassword then
 					client.sendingBuffer = client.sendingBuffer .. line .. "\n"
 				end
 			end
@@ -291,16 +279,16 @@ function tcpHost:sendTo( data, toClient )
 	return err
 end
 
+function tcpHost:sendTo( data, toClient, noPassword )
+	return self:send( data, toClient, nil, noPassword )
+end
+
 function tcpHost:echoLine( line, fromClient )
-	assert(type(line) == "string")
-	
-	for k, client in pairs(self.clients) do
-		if fromClient ~= client then
-			if client.hasPassword then
-				client.sendingBuffer = client.sendingBuffer .. line .. "\n"
-			end
-		end
-	end
+	return self:send( line, nil, fromClient, nil, true )
+end
+
+function tcpHost:getClientCount()
+	return #self.set
 end
 
 function tcpHost:isHost()

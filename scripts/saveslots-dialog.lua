@@ -18,7 +18,7 @@ local function onClickHost( dialog, campaign )
 	
 	dialog:hide()
 	statemgr.deactivate( dialog._mainMenu )
-	statemgr.activate( multiMod.stateSetup, campaign )
+	statemgr.activate( multiMod.stateSetupWerp, campaign )
 end
 
 ----------------------------------------------------------------

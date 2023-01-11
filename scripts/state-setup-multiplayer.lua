@@ -26,7 +26,7 @@ local function togglePw( self )
 		self.screen.binder.configPanel.binder.pw:setPasswordChar("*")
 	end
 end
-		
+
 local stateConnecting = {
 	onUnload = function ( self )
 		mui.deactivateScreen( self.screen )
@@ -49,91 +49,92 @@ local stateConnecting = {
 }
 
 local function launchHost( self )
-		-- Signal the server to start listening to clients, then launch the multiplayer campaign.
-		local campaign = self._campaign
-		local diff = self._diff
-		local options = self._campaignOptions
-		local port = tonumber(self.screen.binder.configPanel.binder.port:getText())
+	-- Signal the server to start listening to clients, then launch the multiplayer campaign.
+	local campaign = self._campaign
+	local diff = self._diff
+	local options = self._campaignOptions
+	local port = tonumber(self.screen.binder.configPanel.binder.port:getText())
+	
+	statemgr.activate( multiMod, self.host, port, self.screen.binder.configPanel.binder.pw:getText() )
+	statemgr.deactivate( self )
+	if campaign then
+		-- We are resuming an existing campaign.
+		multiMod:loadCampaignGame( campaign )
 		
-		statemgr.activate( multiMod, self.host, port, self.screen.binder.configPanel.binder.pw:getText() )
-		statemgr.deactivate( self )
-		if campaign then
-			-- We are resuming an existing campaign.
-			multiMod:loadCampaignGame( campaign )
+		if campaign.situation == nil then
+			-- Go to map screen if the campaign currently isn't mid-mission.
+			MOAIFmodDesigner.playSound( cdefs.SOUND_HUD_GAME_WOOSHOUT )
+			MOAIFmodDesigner.stopSound("theme")
+			local stateMapScreen = include( "states/state-map-screen" )
 			
-			if campaign.situation == nil then
-				-- Go to map screen if the campaign currently isn't mid-mission.
-				MOAIFmodDesigner.playSound( cdefs.SOUND_HUD_GAME_WOOSHOUT )
-				MOAIFmodDesigner.stopSound("theme")
-				local stateMapScreen = include( "states/state-map-screen" )
-				
-				statemgr.activate( stateMapScreen(), campaign )
-			else
-				local stateLoading = include( "states/state-loading" )
-				stateLoading:loadCampaign( campaign )
-			end
+			statemgr.activate( stateMapScreen(), campaign )
 		else
-			-- We are launching a new campaign.
-			local stateTeamPreview = include( "states/state-team-preview" )
-			
-			statemgr.activate( stateTeamPreview( diff, options ) )
+			local stateLoading = include( "states/state-loading" )
+			stateLoading:loadCampaign( campaign )
 		end
+	else
+		-- We are launching a new campaign.
+		local stateTeamPreview = include( "states/state-team-preview" )
+		
+		statemgr.activate( stateTeamPreview( diff, options ) )
+	end
 end
 
 local function launchClient( self )
-		local client = multiMod.client
-		local ip = self.screen.binder.configPanel.binder.ipAdress:getText()
-		local port = tonumber(self.screen.binder.configPanel.binder.port:getText())
-		local pw = self.screen.binder.configPanel.binder.pw:getText()
-		
-		-- Create a client object and attempt to connect to the server
-		MOAIFmodDesigner.playSound(  cdefs.SOUND_HUD_MENU_POPUP )
-		statemgr.activate( multiMod, client, ip, port, pw )
-		statemgr.activate( stateConnecting )
-		
-		local header = stateConnecting.screen.binder.headerTxt
-		local body = stateConnecting.screen.binder.bodyTxt
-		
-		while stateConnecting.result ~= modalDialog.CANCEL do
-			if client.err then
-				-- Unhandled error.
-				header:setText( STRINGS.MULTI_MOD.CONNECTION_FAILED )
-				body:setText( client.err )
-			elseif client.passwordAccepted then
-				-- We're in!
-				body:setText( STRINGS.MULTI_MOD.WAITING_JOINING )
-				
-				-- Put some kind of lobby screen here maybe?
-				if multiMod.campaign then
-					if statemgr.isActive( stateConnecting ) then
-						statemgr.deactivate( stateConnecting )
-					end
-					if statemgr.isActive( self ) then
-						statemgr.deactivate( self )
-					end
-					
-					-- This should be where we launch into the game...
-					-- ...but for now we'll just assume that the client got the info it needs from the server and figures out what to do by itself.
-					return
-				end
-			elseif client.passwordRejected then
-				body:setText( STRINGS.MULTI_MOD.PASSWORD_REJECTED )
-			elseif client.connected then
-				-- Connection established!
-				-- Now wait for a password confirmation.
-				body:setText( STRINGS.MULTI_MOD.WAITING_PASSWORD )
-			end
+	local client = multiMod.client
+	local ip = self.screen.binder.configPanel.binder.ipAdress:getText()
+	local port = tonumber(self.screen.binder.configPanel.binder.port:getText())
+	local pw = self.screen.binder.configPanel.binder.pw:getText()
+	
+	-- Create a client object and attempt to connect to the server
+	MOAIFmodDesigner.playSound(  cdefs.SOUND_HUD_MENU_POPUP )
+	statemgr.activate( multiMod, client, ip, port, pw )
+	statemgr.activate( stateConnecting )
+	
+	local err = self.client:send( {pw=pw} )
+	local header = stateConnecting.screen.binder.headerTxt
+	local body = stateConnecting.screen.binder.bodyTxt
+	
+	while stateConnecting.result ~= modalDialog.CANCEL do
+		if client.err or err then
+			-- Unhandled error.
+			header:setText( STRINGS.MULTI_MOD.CONNECTION_FAILED )
+			body:setText( client.err or err )
+		elseif client.passwordAccepted then
+			-- We're in!
+			body:setText( STRINGS.MULTI_MOD.WAITING_JOINING )
 			
-			coroutine.yield()
+			-- Put some kind of lobby screen here maybe?
+			if multiMod.campaign then
+				if statemgr.isActive( stateConnecting ) then
+					statemgr.deactivate( stateConnecting )
+				end
+				if statemgr.isActive( self ) then
+					statemgr.deactivate( self )
+				end
+				
+				-- This should be where we launch into the game...
+				-- ...but for now we'll just assume that the client got the info it needs from the server and figures out what to do by itself.
+				return
+			end
+		elseif client.passwordRejected then
+			body:setText( STRINGS.MULTI_MOD.PASSWORD_REJECTED )
+		elseif client.connected then
+			-- Connection established!
+			-- Now wait for a password confirmation.
+			body:setText( STRINGS.MULTI_MOD.WAITING_PASSWORD )
 		end
+		
+		coroutine.yield()
+	end
 
-		-- It's possible for shutdown to preemptively deactivate active dialogs from under us.
-		if statemgr.isActive( stateConnecting ) then
-			statemgr.deactivate( stateConnecting )
-		end
-		if statemgr.isActive( multiMod ) then
-			statemgr.deactivate( multiMod )
-		end
+	-- It's possible for shutdown to preemptively deactivate active dialogs from under us.
+	if statemgr.isActive( stateConnecting ) then
+		statemgr.deactivate( stateConnecting )
+	end
+	if statemgr.isActive( multiMod ) then
+		statemgr.deactivate( multiMod )
+	end
 end
 
 local function onClickOk( self )
@@ -261,8 +262,9 @@ local function onClickCancel( self )
 	MOAIFmodDesigner.playSound( cdefs.SOUND_HUD_GAME_WOOSHOUT )
 	
 	local stateGenerationOptions = include( "states/state-generation-options" )
+	local diff, options = self._diff, self._campaignOptions
 	statemgr.deactivate( self )
-	statemgr.activate( stateGenerationOptions(), self._diff, self._campaignOptions )
+	statemgr.activate( stateGenerationOptions(), diff, options )
 end
 
 local function toMainMenu( self )

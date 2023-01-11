@@ -36,6 +36,7 @@ function stateMultiplayer:onLoad( uplink, ... )
 	assert(not self.uplink)
 	self.uplink = uplink
 	self.votingMode = self.MISSION_VOTING.HOSTDECIDES
+	
 	return uplink:onLoad(self, ...)
 end
 
@@ -116,6 +117,7 @@ function stateMultiplayer:loadCampaignGame(campaign)
 			-- For now, we simply let the host decide everything that happens outside of a mission
 			
 			self.campaign = campaign
+			campaign.multiModName = self.uplink.campaignName
 			
 			if campaign.situation then
 				self:trackSimHistory()
@@ -137,14 +139,19 @@ function stateMultiplayer:loadCampaignGame(campaign)
 	end
 end
 
+function stateMultiplayer:onConnectionError( err )
+	if not statemgr.isActive( multiMod.stateSetupWerp ) then
+		local thread = MOAICoroutine.new()
+		thread:run( modalDialog.show, err, STRINGS.MULTI_MOD.CONNECTION_ERROR )
+		thread:resume()
+	end
+	
+	statemgr.deactivate(self)
+end
+
 function stateMultiplayer:onClientDisconnect( client, message )
 	if self.missionVotes then
-		local i = client.clientIndex
-		repeat
-			self.missionVotes[i] = self.missionVotes[i + 1]
-			i = i + 1
-		until i > #self.uplink.set
-		
+		self.missionVotes[client.clientIndex] = nil
 		self:checkVotes()
 	end
 end
@@ -424,17 +431,14 @@ function stateMultiplayer:checkVotes()
 	local usedVotes = {}
 	local voteMap = {}
 	local bestVote = 0
-	local maxVotes = #self.uplink.set + 1
+	local maxVotes = self.uplink:getClientCount() + 1
 
-	for i = 0, #self.uplink.set do
-		local vote = self.missionVotes[i]
-		if vote then
-			voteCount = voteCount + 1
-			voteMap[vote] = (voteMap[vote] or 0) + 1
-			table.insert(usedVotes, vote)
-			if voteMap[vote] > bestVote then
-				bestVote = voteMap[vote]
-			end
+	for playerIndex, vote in pairs( self.missionVotes[i] ) do
+		voteCount = voteCount + 1
+		voteMap[vote] = (voteMap[vote] or 0) + 1
+		table.insert(usedVotes, vote)
+		if voteMap[vote] > bestVote then
+			bestVote = voteMap[vote]
 		end
 	end
 	

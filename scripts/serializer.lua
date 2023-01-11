@@ -192,8 +192,9 @@ end
 
 local deserializeAction = function(str)
 	if type(str) ~= type("string") then
-		log:write("Can't deserialize, expected string and got "..type("string"))
-		return
+		err = "Can't deserialize, expected string and got "..type("string")
+		log:write(err)
+		return err
 	end
 
 	i = 1
@@ -201,7 +202,7 @@ local deserializeAction = function(str)
 	local t = deserialize(str)
 	if err then
 		log:write("Deserialization Failed: "..err)
-		return
+		return nil, err
 	end
 	
 	return t

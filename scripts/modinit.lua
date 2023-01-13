@@ -21,8 +21,8 @@ local function init( modApi )
 	multiMod.DEFAULT_PORT = 27017
 	multiMod.MULTI_MOD_VERSION = 1
 	multiMod.COMPABILITY_VERSION = 1
-	multiMod.WERP_ADRESS = "localhost"
-	multiMod.WERP_PORT = 27017
+	multiMod.WERP_ADRESS = "werp.site"
+	multiMod.WERP_PORT = 31337
 	multiMod.VERBOSE = true
 	log:write("MULTIMOD VERSION "..tostring(multiMod.MULTI_MOD_VERSION))
 	multiMod.socketCore = include( "socket.core" )

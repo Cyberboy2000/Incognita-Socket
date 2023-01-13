@@ -59,11 +59,15 @@ function werpClient:receiveLine( fullLine )
 	-- Received line from werp: Split it into a command with parameters
 	local params = {}
 	
-	for param in string.gmatch( "([^|]+)") do
+	for param in string.gmatch( string.gsub( fullLine, "||", "|¤|" ), "([^|]+)") do
 		table.insert(params, param)
 	end
 	
 	local command = params[1] or fullLine
+	
+	if multiMod.VERBOSE then
+		log:write("Received werp command "..fullLine)
+	end
 	
 	if command == "RECEIVED" then -- Normal gameplay message (used by both clients and host)
 		local gameId = params[2]
@@ -165,6 +169,8 @@ function werpClient:receiveLine( fullLine )
 	elseif command == "GAME_OVER" then -- Host closed game (used by clients)
 		self.receiver:onConnectionError( STRINGS.MULTI_MOD.GAME_OVER )
 	elseif command == "LEFT" or command == "LEAVE_FAILED" then -- Unused
+	elseif command == "ERROR" then
+		log:write("Server error: "..params[2])
 	else
 		log:write("Unknown command: "..fullLine)
 	end

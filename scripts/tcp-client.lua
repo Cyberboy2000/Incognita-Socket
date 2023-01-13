@@ -94,6 +94,10 @@ function tcpClient:onUpdate(  )
 				local fullLine = self.receivingBuffer..line
 				self.receivingBuffer = ""
 				
+				if multiMod.VERBOSE then
+					log:write("Received "..tostring(fullLine))
+				end
+				
 				self:receiveLine(fullLine)
 			end
 		end
@@ -131,10 +135,6 @@ function tcpClient:onUpdate(  )
 end
 
 function tcpClient:receiveLine(fullLine)
-	if multiMod.VERBOSE then
-		log:write("Received "..tostring(fullLine))
-	end
-	
 	local data, err = multiMod.serializer.deserializeAction(fullLine)
 	-- Check if the password was accepted.
 	if type(data) == "table" then

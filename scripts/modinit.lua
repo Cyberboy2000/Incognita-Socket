@@ -19,8 +19,8 @@ local function init( modApi )
 	rawset(_G,"multiMod",include( scriptPath.."/state-multiplayer" ))
 	
 	multiMod.DEFAULT_PORT = 27017
-	multiMod.MULTI_MOD_VERSION = 1
-	multiMod.COMPABILITY_VERSION = 1
+	multiMod.MULTI_MOD_VERSION = 2
+	multiMod.COMPABILITY_VERSION = 2
 	multiMod.WERP_ADRESS = "werp.site"
 	multiMod.WERP_PORT = 31337
 	multiMod.VERBOSE = true

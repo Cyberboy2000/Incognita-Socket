@@ -520,7 +520,7 @@ function stateMultiplayer:startMissionImmediately( situationIndex )
 	local thread = coroutine.create( goToMapAndStartMission )
 	coroutine.resume( thread, self, situationIndex )
 	
-	while coroutine.status( self.loadThread ) ~= "dead" do
+	while coroutine.status( thread ) ~= "dead" do
 		coroutine.resume( thread )
 	end
 	

@@ -59,7 +59,7 @@ function werpClient:receiveLine( fullLine )
 	-- Received line from werp: Split it into a command with parameters
 	local params = {}
 	
-	for param in string.gmatch( string.gsub( fullLine, "||", "|¤|" ), "([^|]+)") do
+	for param in string.gmatch( fullLine, "([^|]+)") do
 		table.insert(params, param)
 	end
 	

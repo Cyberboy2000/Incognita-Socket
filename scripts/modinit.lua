@@ -43,6 +43,10 @@ local function init( modApi )
 	include( scriptPath.."/state-upgrade-screen" )
 end
 
+local function showSetup( stateGenerationOptions, difficulty, options )
+	statemgr.activate( multiMod.stateSetupWerp, nil, difficulty, options )
+end
+
 local function load( modApi, options, params )
 	multiMod.params = nil
 	
@@ -53,9 +57,8 @@ local function load( modApi, options, params )
 	
 	if options["multiMod"] and options["multiMod"].enabled and params then
 		multiMod.params = params
-		params.exitfunction = function(stateGenerationOptions)
-			statemgr.activate( multiMod.stateSetupWerp, nil, stateGenerationOptions._diff, multiMod.params )
-		end
+		
+		modApi:addPostGenerationOptionsFunction( showSetup )
 	end
 end
 

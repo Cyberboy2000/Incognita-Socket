@@ -21,7 +21,7 @@ local FORMAT = {
 	-- Other
 	NUM = "#",
 	NUM_END = "*",
-	NIL = "¤",
+	NIL = ":",
 	TRUE = "^",
 	FALSE = "~",
 }

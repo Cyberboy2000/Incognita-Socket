@@ -41,6 +41,7 @@ local function init( modApi )
 	include(scriptPath.."/saveslots-dialog")
 	include( scriptPath.."/state-map-screen" )
 	include( scriptPath.."/state-upgrade-screen" )
+	include( scriptPath.."/modal_thread" )
 end
 
 local function showSetup( stateGenerationOptions, difficulty, options )
@@ -67,7 +68,7 @@ local function unload( modApi, params )
 end
 
 local function earlyInit( modApi )
-	modApi.requirements = {"Quick Loader"}
+	modApi.requirements = {"Quick Loader","Agent Reserve"}
 end
 
 return {

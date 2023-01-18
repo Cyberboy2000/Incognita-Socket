@@ -81,6 +81,29 @@ local function toMainMenu( self )
 	stateLoading:loadFrontEnd() -- This automatically shuts down multiplayer
 end
 
+local function onClickOffline( self, diff, options )
+	if self.showsConfigPanel then return end
+	
+	-- Launch the singleplayer campaign
+	local stateTeamPreview = include( "states/state-team-preview" )
+	local endless = options.maxHours == math.huge
+	statemgr.deactivate( self )
+	if multiMod:getUplink() then
+		statemgr.deactivate(multiMod) -- Shutdown multiplayer
+	end
+	
+    if endless or not config.SHOW_MOVIE then
+        statemgr.activate( stateTeamPreview( diff, options ) )
+    else
+		MOAIFmodDesigner.stopSound("theme")
+		local movieScreen = include('client/fe/moviescreen')
+		local SCRIPTS = include('client/story_scripts')
+        movieScreen("data/movies/IntroCinematic.ogv", function()
+            statemgr.activate( stateTeamPreview( diff, options ) )
+        end,  SCRIPTS.SUBTITLES.INTRO )
+    end
+end
+
 --------------------------------------------------
 --   Joins an open game through the werp site   --
 --------------------------------------------------
@@ -340,6 +363,10 @@ function stateSetupWerp:onLoad( campaign, difficulty, params )
 	self.binder.hostBtn.binder.btn.onClick = util.makeDelegate(nil, onClickHost, self, false)
 	self.binder.hostBtn.binder.btn:setClickSound( cdefs.SOUND_HUD_MENU_CONFIRM )
 	self.binder.hostBtn.binder.btn:setText( STRINGS.MULTI_MOD.BUTTON_HOST )
+	
+	self.binder.offlineBtn.binder.btn.onClick = util.makeDelegate(nil, onClickOffline, self, difficulty, params )
+	self.binder.offlineBtn.binder.btn:setClickSound( cdefs.SOUND_HUD_MENU_CONFIRM )
+	self.binder.offlineBtn.binder.btn:setText( STRINGS.MULTI_MOD.BUTTON_LOCAL )
 	
 	self.binder.cancelBtn.binder.btn.onClick = util.makeDelegate(nil, onClickCancel, self)
 	self.binder.cancelBtn.binder.btn:setClickSound( cdefs.SOUND_HUD_MENU_CANCEL )

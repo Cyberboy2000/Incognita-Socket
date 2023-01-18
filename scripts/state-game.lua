@@ -54,18 +54,8 @@ function game:doRemoteAction(action)
 		oldRewindTurns(self)
 		self.isRemoteRewinding = nil
 	elseif type(action.rChoice) == "table" then
-		if self.hud and self.hud._choice_dialog then
-			mui.deactivateScreen( self.hud._choice_dialog )
-			self.hud._choice_dialog = nil
-		end
-	
-		local topAction = self.simHistory[#self.simHistory]
-		if topAction then
-			topAction.choices = topAction.choices or {}
-			for i, choice in pairs( action.rChoice ) do
-				topAction.choices[i] = choice
-				self.simCore._choices[ i ] = choice
-			end
+		for i, choice in pairs( action.rChoice ) do
+			self.simCore._choices[ i ] = choice
 		end
 	else
 		local actionName = action.name
@@ -81,6 +71,8 @@ function game:doRemoteAction(action)
 			self:play()
 		end
 	end
+	
+	multiMod.autoClose = true
 end
 
 ----------------------------------------------------------------

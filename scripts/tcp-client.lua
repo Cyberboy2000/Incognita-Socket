@@ -73,7 +73,7 @@ function tcpClient:onUnload(  )
 end
 
 ----------------------------------------------------------------
-function tcpClient:onUpdate(  )
+function tcpClient:onUpdateWrapped(  )
 	if self.connected then
 		-- Receive data from the server.
 		local readable, writeable = tcpSelect({self.tcp},{self.tcp},0)
@@ -131,6 +131,18 @@ function tcpClient:onUpdate(  )
 				self:onError(err,true)
 			end
 		end
+	end
+end
+
+function tcpClient:onUpdate(  )
+	local tempThread = coroutine.create( self.onUpdateWrapped )
+	if coroutine.status( tempThread ) == "suspended" then
+		local ok, err = coroutine.resume( tempThread, self )
+		if not ok then
+			log:write( err )
+		end
+	else
+		log:write("STATUS ISSUE: "..coroutine.status( tempThread ))
 	end
 end
 

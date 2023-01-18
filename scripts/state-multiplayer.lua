@@ -27,6 +27,28 @@ local stateMultiplayer = {
 	}
 }
 
+local function deepCompare(t1, t2)
+	if type(t1) == "table" and type(t2) == "table" then
+		-- Match every value in t1 with a value in t2
+		for k, v in pairs(t1) do
+			if not deepCompare( v, t2[k] ) then
+				return false
+			end
+		end
+		
+		-- Some keys might only exist in t2
+		for k,v in pairs(t2) do
+			if t1[k] == nil then
+				return false
+			end
+		end
+	
+		return true
+	else
+		return t1 == t2
+	end
+end
+
 ----------------------------------------------------------------
 --   Set up a TCP server and read messages from the clients   --
 ----------------------------------------------------------------
@@ -48,9 +70,11 @@ function stateMultiplayer:onUnload(  )
 	self.campaign = nil
 	self.upgradeHistory = nil
 	self.missionVotes = nil
+	self.autoClose = nil
 end
 
 function stateMultiplayer:onUpdate(  )
+	self.autoClose = nil
 	self.uplink:onUpdate(  )
 end
 
@@ -89,7 +113,7 @@ function stateMultiplayer:stopTrackingSimHistory()
 end
 
 function stateMultiplayer:getCurrentGame( )
-    return self.game
+	return self.game
 end
 
 function stateMultiplayer:isHost()
@@ -157,13 +181,13 @@ function stateMultiplayer:onClientDisconnect( client, message )
 end
 
 ----------------------------------------------------------------
---                   Handle game logic here                   --
+--				   Handle game logic here				   --
 ----------------------------------------------------------------
 
 function stateMultiplayer:receiveData(client,data,line)
 	-- Handle game logic here
 	if multiMod.VERBOSE then
-		log:write("Received "..line)
+		--log:write("Received "..line)
 	end
 	
 	if type(data) == "table" then
@@ -198,9 +222,16 @@ function stateMultiplayer:receiveData(client,data,line)
 						game:doRemoteAction(data)
 					end
 				end
+			elseif deepCompare( self.onlineHistory[data.ohi], data ) then
+				-- Exact duplicate: No action needed
+				if multiMod.VERBOSE then
+					log:write("Received duplicate data for %i: Ignoring", data.ohi)
+				end
 			elseif self:isClient() and #self.onlineHistory + 1 > data.ohi then
 				-- If we're the client and the index of the action doesn't match, then the host probably overruled our action
 				-- Remove any history we wrote down after that point
+				log:write("Online history mismatch: Rewinding")
+				
 				while #self.onlineHistory + 1 > data.ohi do
 					table.remove(self.onlineHistory)
 				end
@@ -216,6 +247,7 @@ function stateMultiplayer:receiveData(client,data,line)
 				-- Ok, I don't know how we got here, but if we're here then we must be completely desynced
 				-- Request from the host that we get a complete version of the history
 				-- We could attempt to fix this more subtly
+				log:write("Online history mismatch: Requesting full history")
 				self:send({reqOh=true})
 			end
 		elseif self:isClient() then
@@ -231,6 +263,9 @@ function stateMultiplayer:receiveData(client,data,line)
 					game:fromOnlineHistory(self.onlineHistory)
 				end
 			elseif data.startM then
+				if data.upAgency then
+					self.campaign.agency = data.upAgency
+				end
 				self:startMissionImmediately( data.startM )
 			end
 		elseif data.reqOh then
@@ -327,8 +362,8 @@ function stateMultiplayer:setRemoteCampaign(campaign)
 			modalDialog.show( reason )
 		end
 		
-        local stateLoading = include( "states/state-loading" )
-        stateLoading:loadFrontEnd()
+		local stateLoading = include( "states/state-loading" )
+		stateLoading:loadFrontEnd()
 	end
 end
 
@@ -351,17 +386,17 @@ function stateMultiplayer:canContinueCampaign( campaign )
 		return false, reason
 	end
 
-    if campaign.difficultyOptions.enabledDLC and next(campaign.difficultyOptions.enabledDLC) then
-    	--log:write("Campaign has installed mods:")
-        for modID, info in pairs(campaign.difficultyOptions.enabledDLC) do
-        	--log:write("    [%s] %s %s", modID, info.name, mod_manager:isInstalled( modID ) and "OK" or "(missing)")
-            if info.enabled and not mod_manager:isInstalled( modID ) then
-        		local reason = "<ttheader>" .. STRINGS.UI.SAVE_NOT_COMPATIBLE.. "<font1_12_r>\n"
-                reason = reason .. util.sformat( STRINGS.UI.SAVE_NEEDS_DLC, info.name )
-                return false, reason
-            end
-        end
-    end
+	if campaign.difficultyOptions.enabledDLC and next(campaign.difficultyOptions.enabledDLC) then
+		--log:write("Campaign has installed mods:")
+		for modID, info in pairs(campaign.difficultyOptions.enabledDLC) do
+			--log:write("	[%s] %s %s", modID, info.name, mod_manager:isInstalled( modID ) and "OK" or "(missing)")
+			if info.enabled and not mod_manager:isInstalled( modID ) then
+				local reason = "<ttheader>" .. STRINGS.UI.SAVE_NOT_COMPATIBLE.. "<font1_12_r>\n"
+				reason = reason .. util.sformat( STRINGS.UI.SAVE_NEEDS_DLC, info.name )
+				return false, reason
+			end
+		end
+	end
 
 	return true
 end
@@ -399,7 +434,7 @@ function stateMultiplayer:voteMission( situationIndex, playerIndex )
 	if self.votingMode == self.MISSION_VOTING.HOSTDECIDES then
 		if self:isHost() and not playerIndex then
 			self:trackSimHistory()
-			local action = {startM = situationIndex}
+			local action = {startM = situationIndex, upAgency = self.campaign.agency}
 			self.uplink:send(action)
 			return true
 		else
@@ -433,7 +468,7 @@ function stateMultiplayer:checkVotes()
 	local bestVote = 0
 	local maxVotes = self.uplink:getClientCount() + 1
 
-	for playerIndex, vote in pairs( self.missionVotes[i] ) do
+	for playerIndex, vote in pairs( self.missionVotes ) do
 		voteCount = voteCount + 1
 		voteMap[vote] = (voteMap[vote] or 0) + 1
 		table.insert(usedVotes, vote)
@@ -471,39 +506,20 @@ function stateMultiplayer:checkVotes()
 	end
 end
 
-local function goToMapAndStartMission( self, situationIndex )
-	local stateMapScreen = include( "states/state-map-screen" )
-	stateMapScreen = stateMapScreen()
-	statemgr.activate( stateMapScreen, self.campaign, true )
-	
-	-- Need to look up the mission preview screen in order to pass it to closePreview :(
-	local previewScreen
-	local oldCreateScreen = mui.createScreen
-	mui.createScreen = function( name, ... )
-		local screen = oldCreateScreen( name, ... )
-	
-		if name == "mission_preview_dialog.lua" then
-			previewScreen = screen
+function stateMultiplayer:findScreen( filename )
+	local screens = mui.internals._activeScreens
+	for k, screen in pairs(screens) do
+		if filename == screen._filename then
+			return screen
 		end
-		
-		return screen
 	end
-	
-	stateMapScreen:OnClickLocation( self.campaign.situations[situationIndex] )
-	mui.createScreen = oldCreateScreen
-	stateMapScreen:closePreview(previewScreen, self.campaign.situations[situationIndex], true)
 end
 
-function stateMultiplayer:startMissionImmediately( situationIndex )
-	-- This isn't ideal, but we want to make sure we check things like campaign events that normally only run on the map screen
-	-- Solution: Unloading everything, then load in the map screen, then skip through everything that normally happens on the map screen when selecting a mission
-
-	self.startingMission = true
-
+local function goToMapAndStartMission( self, situationIndex )
 	local stateStack = statemgr.getStates()
 	local state = stateStack[#stateStack]
 	
-	while #stateStack > 0 and not state.uplink do
+	while state and not state.uplink do
 		table.remove( stateStack, #stateStack )
 
 		if type ( state.onUnload ) == "function" then
@@ -513,15 +529,34 @@ function stateMultiplayer:startMissionImmediately( situationIndex )
 		state = stateStack[#stateStack]
 	end
 	
+	local stateMapScreen = include( "states/state-map-screen" )
+	stateMapScreen = stateMapScreen()
+	statemgr.activate( stateMapScreen, self.campaign, true )
+	
+	stateMapScreen:OnClickLocation( self.campaign.situations[situationIndex] )
+	local previewScreen = self:findScreen( "mission_preview_dialog.lua" )
+	stateMapScreen:closePreview(previewScreen, self.campaign.situations[situationIndex], true)
+end
+
+function stateMultiplayer:startMissionImmediately( situationIndex )
+	-- This isn't ideal, but we want to make sure we check things like campaign events that normally only run on the map screen
+	-- Solution: Unloading everything, then load in the map screen, then skip through everything that normally happens on the map screen when selecting a mission
+
+	self.startingMission = true
 	self:trackSimHistory()
 	self:stopFMOD()
-	
+
 	--What happens if this coroutine fails? :/
 	local thread = coroutine.create( goToMapAndStartMission )
-	coroutine.resume( thread, self, situationIndex )
+	local ok, err = coroutine.resume( thread, self, situationIndex )
 	
 	while coroutine.status( thread ) ~= "dead" do
-		coroutine.resume( thread )
+		ok, err = coroutine.resume( thread )
+	end
+	
+	if not ok then
+		log:write("Coroutine returned "..util.stringize(err,1))
+		log:write(debug.traceback( thread ))
 	end
 	
 	self:restoreFMOD()
@@ -539,11 +574,14 @@ function stateMultiplayer:stopFMOD()
 	if not self.FMOD then
 		-- Need to stop sounds from playing as we skip past them
 		-- Could maybe use MOAIFmodDesigner.stopAllSounds() instead?
+		MOAIFmodDesigner.stopAllSounds()
 		self.FMOD = MOAIFmodDesigner
 		MOAIFmodDesigner = {
 			setCameraProperties = function() end,
 			playSound = function() end,
-			stopSound = function() end,
+			stopSound = function(...) if self.FMOD then self.FMOD.stopSound(...) end end,
+			isPlaying = function() return false end,
+			stopAllSounds = function() end,
 		}
 	end
 end

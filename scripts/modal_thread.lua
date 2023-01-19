@@ -1,7 +1,7 @@
 local modal_thread = include( "gameplay/modal_thread" )
 local modalDialog = include( "states/state-modal-dialog" )
 
-function modal_thread.checkAutoClose( modal, game )
+function modal_thread.checkAutoClose( modal, game, ignoreMultiMod )
     if game.chessTimer and game.chessTimer >= game.params.difficultyOptions.timeAttack then
         -- Time has expired.
         return modalDialog.CANCEL
@@ -15,7 +15,7 @@ function modal_thread.checkAutoClose( modal, game )
         end
     end
 	
-	if multiMod.autoClose then
+	if multiMod.autoClose and not ignoreMultiMod then
 		return modalDialog.CANCEL
 	end
 

@@ -8,7 +8,6 @@ local modalDialog = include( "states/state-modal-dialog" )
 local stateUpgradeScreen = include( "states/state-upgrade-screen" )
 
 local skillChanges = stateUpgradeScreen.skillChanges
-local oldUnload = stateUpgradeScreen.onUnload
 
 local oldLearnSkill = skillChanges.learnSkill
 local oldUndoSkill = skillChanges.undoSkill
@@ -93,13 +92,4 @@ stateUpgradeScreen.refreshInventory = function( self, unitDef, index )
 			--widget.binder.btn.onClick._fn = onClickStash
 		end
 	end
-end
-
-stateUpgradeScreen.onUnload = function( self )
-	local storyHeadScreen = multiMod:findScreen( "modal-monst3r.lua" )
-	if storyHeadScreen then
-		mui.deactivateScreen( storyHeadScreen ) 
-	end
-	
-	oldUnload( self )
 end

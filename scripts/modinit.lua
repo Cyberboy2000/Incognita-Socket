@@ -53,6 +53,7 @@ local function load( modApi, options, params )
 	
 	local scriptPath = modApi:getScriptPath()
 	modApi:addNewUIScreen( "modal-setup-multiplayer", scriptPath.."/modal-setup-multiplayer" )
+	modApi:addNewUIScreen( "hud-multiplayer", scriptPath.."/hud-multiplayer" )
 	modApi:insertUIElements( include( scriptPath.."/screen_inserts" ) )
 	modApi:modifyUIElements( include( scriptPath.."/screen_modifications" ) )
 	

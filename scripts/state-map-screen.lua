@@ -36,11 +36,6 @@ function mapScreen:onUnload()
 		self.loadThread:stop()
 		self.loadThread = nil
 	end
-	
-	local storyHeadScreen = multiMod:findScreen( "modal-story.lua" )
-	if storyHeadScreen then
-		mui.deactivateScreen( storyHeadScreen ) 
-	end
 
 	oldOnUnLoad( self )
 end

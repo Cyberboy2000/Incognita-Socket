@@ -27,6 +27,12 @@ local stateMultiplayer = {
 	}
 }
 
+local screensToDeactivate = {
+	"modal-monst3r.lua",
+	"modal-story.lua",
+	"modal-logs.lua"
+}
+
 local function deepCompare(t1, t2)
 	if type(t1) == "table" and type(t2) == "table" then
 		-- Match every value in t1 with a value in t2
@@ -58,6 +64,10 @@ function stateMultiplayer:onLoad( uplink, ... )
 	assert(not self.uplink)
 	self.uplink = uplink
 	self.votingMode = self.MISSION_VOTING.HOSTDECIDES
+	self.screen = mui.createScreen( "hud-multiplayer" )
+	self.screen:setPriority( 1000000 )
+	mui.activateScreen( self.screen )
+	self:updatePlayerList()
 	
 	return uplink:onLoad(self, ...)
 end
@@ -65,12 +75,18 @@ end
 function stateMultiplayer:onUnload(  )
 	self.uplink:onUnload(  )
 	self:restoreFMOD()
+	if self.screen and self.screen:isActive() then
+		mui.deactivateScreen( self.screen )
+	end
+	self.screen = nil
 	self.uplink = nil
 	self.game = nil
 	self.campaign = nil
 	self.upgradeHistory = nil
 	self.missionVotes = nil
 	self.autoClose = nil
+	self.showPlayerList = nil
+	self.userName = nil
 end
 
 function stateMultiplayer:onUpdate(  )
@@ -80,6 +96,30 @@ end
 
 function stateMultiplayer:getUplink(  )
 	return self.uplink
+end
+
+function stateMultiplayer:setUserName( name )
+	self.userName = name
+end
+
+function stateMultiplayer:updatePlayerList()
+	if self:isHost() and self.campaign then
+		self.screen.binder.playerListHeader:setVisible(true)
+		self.screen.binder.playerList:setVisible(true)
+		self.screen.binder.playerList:clearItems()
+		local hostWidget = self.screen.binder.playerList:addItem(  )
+		hostWidget.binder.txt:setText( self.userName )
+		
+		if self.uplink then
+			for i, client in ipairs( self.uplink.clients ) do
+				local widget = self.screen.binder.playerList:addItem(  )
+				widget.binder.txt:setText( client.userName )
+			end
+		end
+	else
+		self.screen.binder.playerListHeader:setVisible(false)
+		self.screen.binder.playerList:setVisible(false)
+	end
 end
 
 function stateMultiplayer:startGame( game )
@@ -158,6 +198,7 @@ function stateMultiplayer:loadCampaignGame(campaign)
 				self:stopTrackingSimHistory()
 			end
 			
+			self:updatePlayerList()
 			self.uplink:send(self:mergeCampaign())
 		end
 	end
@@ -174,10 +215,16 @@ function stateMultiplayer:onConnectionError( err )
 end
 
 function stateMultiplayer:onClientDisconnect( client, message )
+	self:updatePlayerList()
+	
 	if self.missionVotes then
 		self.missionVotes[client.clientIndex] = nil
 		self:checkVotes()
 	end
+end
+
+function stateMultiplayer:onClientConnect( client )
+	self:updatePlayerList()
 end
 
 ----------------------------------------------------------------
@@ -310,14 +357,12 @@ function stateMultiplayer:sendChoice(choiceIdx, choice)
 	self.uplink:send(action)
 end
 
-function stateMultiplayer:setRemoteCampaign(campaign)
-	local canContinue, reason = self:canContinueCampaign( campaign )
-		
+function stateMultiplayer:unloadStates()
 	-- Unload unwanted states.
 	local stateStack = statemgr.getStates()
 	local state = stateStack[#stateStack]
 	
-	while #stateStack > 0 and not state.uplink do
+	while state and not state.uplink do
 		table.remove( stateStack, #stateStack )
 
 		if type ( state.onUnload ) == "function" then
@@ -326,6 +371,20 @@ function stateMultiplayer:setRemoteCampaign(campaign)
 		
 		state = stateStack[#stateStack]
 	end
+	
+	for i, filename in ipairs( screensToDeactivate ) do
+		log:write(filename)
+		local screen = self:findScreen( filename )
+		if screen then
+			mui.deactivateScreen( screen ) 
+		end
+	end
+end
+
+function stateMultiplayer:setRemoteCampaign(campaign)
+	local canContinue, reason = self:canContinueCampaign( campaign )
+	
+	self:unloadStates()
 	
 	if canContinue then
 		campaign.sim_history = nil
@@ -516,18 +575,7 @@ function stateMultiplayer:findScreen( filename )
 end
 
 local function goToMapAndStartMission( self, situationIndex )
-	local stateStack = statemgr.getStates()
-	local state = stateStack[#stateStack]
-	
-	while state and not state.uplink do
-		table.remove( stateStack, #stateStack )
-
-		if type ( state.onUnload ) == "function" then
-			state:onUnload ()
-		end
-		
-		state = stateStack[#stateStack]
-	end
+	self:unloadStates()
 	
 	local stateMapScreen = include( "states/state-map-screen" )
 	stateMapScreen = stateMapScreen()

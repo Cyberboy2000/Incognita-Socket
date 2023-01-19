@@ -37,6 +37,7 @@ local MULTI_MOD = {
 	PANEL = {
 		TITLE = "Game Title",
 		PASSWORD = "Password",
+		USERNAME = "Your Name",
 		TOGGLE_PASSWORD = "Toggle password visibility",
 	}
 }

@@ -110,8 +110,11 @@ end
 
 local function joinGame( self, gameData )
 	local data = {
-		pw = self.binder.password.binder.editText:getText()
+		pw = self.binder.password.binder.editText:getText(),
+		userName = self.binder.userName.binder.editText:getText(),
 	}
+	
+	multiMod:setUserName( data.userName )
 	
 	local client = self.uplink
 	client.joinFailed = nil
@@ -273,10 +276,12 @@ local function createGame( self, campaign )
 	local host = self.uplink
 	local password = self.binder.password.binder.editText:getText()
 	local data = {
+		userName = self.binder.userName.binder.editText:getText(),
 		name = self.binder.gameTitle.binder.editText:getText(),
 		hasPw = password and string.len(password) > 0
 	}
 	
+	multiMod:setUserName( data.userName )
 	local err = host:createGame( data, password )
 	
 	statemgr.activate( stateConnecting )
@@ -354,6 +359,7 @@ function stateSetupWerp:onLoad( campaign, difficulty, params )
 	end
 	
 	self.screen.binder.panel:setVisible(false) -- Legacy config panel
+	local user = savefiles.getCurrentGame()
 	
 	self.binder = self.screen.binder.werp.binder
 	self.binder.refreshBtn.binder.btn.onClick = util.makeDelegate(nil, refreshGames, self)
@@ -376,6 +382,8 @@ function stateSetupWerp:onLoad( campaign, difficulty, params )
 	self.binder.okBtn.binder.btn:setClickSound( cdefs.SOUND_HUD_MENU_CONFIRM )
 	self.binder.okBtn.binder.btn:setText( STRINGS.UI.BUTTON_OK )
 	
+	self.binder.userName.binder.editText:setText( user.data.multiPlayerName or "Player" )
+	self.binder.userName.binder.label:setText( STRINGS.MULTI_MOD.PANEL.USERNAME )
 	self.binder.gameTitle.binder.label:setText( STRINGS.MULTI_MOD.PANEL.TITLE )
 	self.binder.password.binder.label:setText( STRINGS.MULTI_MOD.PANEL.PASSWORD )
 	
@@ -401,12 +409,16 @@ function stateSetupWerp:onLoad( campaign, difficulty, params )
 end
 
 function stateSetupWerp:onUnload(  )
+	local user = savefiles.getCurrentGame()
+	user.data.multiPlayerName = self.binder.userName.binder.editText:getText()
+	
 	if self.screen and self.screen:isActive() then
 		mui.deactivateScreen( self.screen )
 	end
 	if statemgr.isActive( stateConnecting ) then
 		statemgr.deactivate( stateConnecting )
 	end
+	
 	
 	self.screen = nil
 	self.showsConfigPanel = nil

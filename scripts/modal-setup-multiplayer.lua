@@ -603,6 +603,22 @@ return {
 							},
 						},
 						{
+							name = [[userName]],
+							isVisible = true,
+							noInput = false,
+							anchor = 1,
+							rotation = 0,
+							x = 0,
+							xpx = true,
+							y = 47,
+							ypx = true,
+							w = 0,
+							h = 0,
+							sx = 1,
+							sy = 1,
+							skin = [[InputField]]
+						},
+						{
 							name = [[gameTitle]],
 							isVisible = true,
 							noInput = false,

@@ -23,6 +23,7 @@ local oldDoAction = game.doAction
 local oldOnLoad = game.onLoad
 local oldOnUnload = game.onUnload
 local oldRewindTurns = game.rewindTurns
+local oldOnPlaybackDone = game.onPlaybackDone
 
 local function event_error_handler( err )
 	moai.traceback( "sim:goto() failed with err:\n" ..err )
@@ -32,9 +33,26 @@ end
 function game:doAction( actionName, ... )
 	local canTakeAction = multiMod:canTakeAction( actionName, ... )
 	local canLocallyTakeAction = multiMod:canTakeLocalAction( actionName, ... )
+	
+	if multiMod:hasYielded() and actionName ~= "mapPinAction" then
+		return
+	end
+	
+	if multiMod.gameMode == multiMod.GAME_MODES.BACKSTAB and actionName == "endTurnAction" and not multiMod:hasYielded() then
+		return multiMod:yield(0)
+	end
+	
+	if multiMod:getUplink() and self.syncedChessTimer then
+		return
+	end
 
 	if not canTakeAction and not canLocallyTakeAction then
 		return
+	end
+	
+	if self.chessTimer and actionName == "endTurnAction" then
+		self.chessTimeTotal = self.chessTimeTotal + self.chessTimer
+		self.chessTimer = 0
 	end
 
 	local oldTop = self.simHistory[#self.simHistory]
@@ -48,6 +66,11 @@ function game:doAction( actionName, ... )
 	end
 end
 
+function game:onPlaybackDone(...)
+	oldOnPlaybackDone(self,...)
+	multiMod:updateEndTurnButton()
+end
+
 function game:doRemoteAction(action)
 	if action.rwnd then
 		self.isRemoteRewinding = true
@@ -59,6 +82,21 @@ function game:doRemoteAction(action)
 		end
 	else
 		local actionName = action.name
+		
+		if actionName == "endTurnAction" then
+			if self.hud then
+				self.hud:abortChoiceDialog()
+				self.hud:hideItemsPanel()
+				self.hud:hideRegenLevel()
+			end
+			
+			self.syncedChessTimer = nil
+			
+			if self.chessTimer then
+				self.chessTimeTotal = self.chessTimeTotal + self.chessTimer
+				self.chessTimer = 0
+			end
+		end
 
 		-- Queue it in the rewind history.
 		table.insert( self.simHistory, action )
@@ -92,9 +130,12 @@ function game:fromOnlineHistory(onlineHistory)
 		self.simCore, self.levelData = gameobj.constructSim( self.params, self.levelData )
 		self.simHistoryIdx = 0
 		self.simHistory = {}
+		local focusAction
 		
 		for i, action in ipairs(onlineHistory) do
-			if action.name and simactions[action.name] then
+			if action.name == "yieldTurnAction" then
+				focusAction = action
+			elseif action.name and simactions[action.name] then
 				table.insert(self.simHistory,action)
 			elseif action.rwnd then
 				local numTurns = 2
@@ -135,6 +176,10 @@ function game:fromOnlineHistory(onlineHistory)
 			end
 			simguard.finish()
 		end
+		
+		if focusAction then
+			table.insert( self.simHistory, focusAction )
+		end
 
 		self.boardRig = boardrig( self.layers, self.levelData, self )
 		self.hud = hud.createHud( self )
@@ -144,6 +189,8 @@ function game:fromOnlineHistory(onlineHistory)
 		self.simCore:getLevelScript():queue( { type="fadeIn" } )
 
 		util.fullGC()
+	else
+		multiMod:updateEndTurnButton()
 	end
 end
 
@@ -164,8 +211,38 @@ end
 ----------------------------------------------------------------
 function game:onLoad( ... )
 	oldOnLoad( self, ... )
+	
 	if multiMod:getUplink() then
 		multiMod:startGame(self)
+		
+		local oldUpdateTimeAttack = self.updateTimeAttack
+		
+		self.doEndTurn = game.doEndTurn
+		
+		self.updateTimeAttack = function(...)
+			if not multiMod:getUplink() then
+				return oldUpdateTimeAttack(...)
+			end
+		
+			if multiMod:hasYielded() or self.debugStep or self.simCore:isGameOver() or self.simCore:getCurrentPlayer():isNPC() then
+				return
+			end
+
+			self.chessTimer = math.min( self.params.difficultyOptions.timeAttack, self.chessTimer + 1 )
+			if self.chessTimer >= self.params.difficultyOptions.timeAttack and not self:isReplaying() then
+				if multiMod.gameMode == multiMod.GAME_MODES.BACKSTAB then
+					-- Vs mode
+					if not multiMod:hasYielded() then
+						multiMod:yield(0)
+					end
+				elseif not self.syncedChessTimer then
+					-- Co-Op Time Attack case: Prevent further actions from being taken locally, but don't actually end turn.
+					-- Server will send an endTurnAction once it's received a time out message from every player.
+					self.syncedChessTimer = true
+					multiMod:chessTimeOut()
+				end
+			end
+		end
 	end
 end
 

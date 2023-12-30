@@ -65,10 +65,6 @@ function werpClient:receiveLine( fullLine )
 	
 	local command = params[1] or fullLine
 	
-	if multiMod.VERBOSE then
-		log:write("Received werp command "..fullLine)
-	end
-	
 	if command == "RECEIVED" then -- Normal gameplay message (used by both clients and host)
 		local gameId = params[2]
 		local userId = params[3]
@@ -99,18 +95,25 @@ function werpClient:receiveLine( fullLine )
 			
 			if userId and data and gameId and gameId == self.gameId then
 				if type(data) == "table" and (data.pw == self.password or not self.hasPassword) then
-					log:write( string.format( "Client %s joined the game", userId) )
 					local client = {
 						userId = userId,
 						clientIndex = self.nextClientIndex,
-						hasPassword = true
+						hasPassword = true,
+						userName = "Player "..userId
 					}
+					
+					if data.userName and data.userName ~= "" then
+						client.userName = tostring(data.userName)
+					end
+					
+					log:write( string.format( "Client %s (%s) joined the game", userId, client.userName ) )
 					
 					self.nextClientIndex = self.nextClientIndex + 1
 					self.userIdToClient[userId] = client
 					self:werpCommand( "ACCEPT_JOIN", gameId, userId )
 					self:sendTo( self.receiver:mergeCampaign( {pwA = true} ), client )
 					table.insert(self.clients,client)
+					self.receiver:onClientConnect( client )
 				else
 					self:werpCommand( "REJECT_JOIN", gameId, userId, "Password Incorrect" )
 				end
@@ -138,8 +141,8 @@ function werpClient:receiveLine( fullLine )
 			}
 			
 			if type( game.message ) == "table" then
-				if game.message.name then
-					game.name = game.message.name
+				if game.message.name and game.message.name ~= "" then
+					game.name = tostring(game.message.name)
 				end
 				if game.message.hasPw then
 					game.hasPw = true
@@ -171,6 +174,7 @@ function werpClient:receiveLine( fullLine )
 	elseif command == "LEFT" or command == "LEAVE_FAILED" then -- Unused
 	elseif command == "ERROR" then
 		log:write("Server error: "..params[2])
+		self:onError(params[2],true)
 	else
 		log:write("Unknown command: "..fullLine)
 	end
@@ -258,6 +262,14 @@ end
 
 function werpClient:getClientCount()
 	return #self.clients
+end
+
+function werpClient:findClient( clientIndex )
+	for i, client in ipairs( self.clients ) do
+		if client.clientIndex == clientIndex then
+			return client
+		end
+	end
 end
 
 function werpClient:isHost()

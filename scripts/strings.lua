@@ -2,6 +2,26 @@ local MULTI_MOD = {
 	NAME = "ONLINE MULTIPLAYER",
 	TIP = "<c:FF8411>ONLINE MULTIPLAYER</c>\nEnables multiplayer over a TCP connection.\nAdvanced options become available when you launch the game.",
 	
+	GAME_MODES = {
+		NAME = "GAME MODE",
+		TIP = "<c:FF8411>GAME MODE</c>Determines the rules for players controlling agents.\n<c:FF8411>FREE FOR ALL</c>\nAny player can control any agent at any time.\n<c:FF8411>BACKSTAB PROTOCOLS</c>\nPlayers control one agent each and take alternating moves. End Turn is replaced with Yield Turn, which hands control to the other player.",
+		OPTS = {
+			"FREE FOR ALL",
+			"BACKSTAB PROTOCOLS"
+		}
+	},
+	
+	MISSION_VOTING = {
+		NAME = "MISSION VOTING",
+		TIP = "<c:FF8411>MISSION VOTING</c>Determines the rules for selecting missions.\n<c:FF8411>FIRST COME FIRST SERVED</c>\nAny player can start a mission.\n<c:FF8411>MAJORITY VOTE</c>\nAll players must select a mission and the mission with the most votes is chosen (random in case of a tie).\n<c:FF8411>WEIGHTED RANDOM</c>\nMissions are chosen at random depending on the number of players that vote on them.\n<c:FF8411>HOST DECIDES</c>\nOnly the host can start a mission.",
+		OPTS = {
+			"FIRST COME FIRST SERVED",
+			"MAJORITY VOTE",
+			"WEIGHTED RANDOM",
+			"HOST DECIDES",
+		}
+	},
+	
 	BUTTON_HOST = "HOST",
 	BUTTON_JOIN = "JOIN",
 	BUTTON_LOCAL = "OFFLINE PLAY",
@@ -34,9 +54,14 @@ local MULTI_MOD = {
 	SOCKET_VERSION_REQUIRED = "Socket version required:",
 	CURRENT_SOCKET_VERSION = "Current socket version:",
 	
+	BACKSTAB_YIELD_SWIPE = "%s ACTIVITY",
+	YIELD = "YIELD TURN",
+	YIELDED_TO = "%s TURN",
+	
 	PANEL = {
 		TITLE = "Game Title",
 		PASSWORD = "Password",
+		USERNAME = "Your Name",
 		TOGGLE_PASSWORD = "Toggle password visibility",
 	}
 }

@@ -264,6 +264,14 @@ function werpClient:getClientCount()
 	return #self.clients
 end
 
+function werpClient:findClient( clientIndex )
+	for i, client in ipairs( self.clients ) do
+		if client.clientIndex == clientIndex then
+			return client
+		end
+	end
+end
+
 function werpClient:isHost()
 	return self.mode == MODE.HOST
 end

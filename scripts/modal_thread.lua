@@ -1,5 +1,6 @@
 local modal_thread = include( "gameplay/modal_thread" )
 local modalDialog = include( "states/state-modal-dialog" )
+local cdefs = include( "client_defs" )
 
 function modal_thread.checkAutoClose( modal, game, ignoreMultiMod )
     if game.chessTimer and game.chessTimer >= game.params.difficultyOptions.timeAttack then

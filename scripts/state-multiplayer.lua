@@ -24,6 +24,10 @@ local stateMultiplayer = {
 		MAJORITY = 1,
 		WEIGHTEDRAND = 2,
 		HOSTDECIDES = 3,
+	},
+	GAME_MODES = {
+		FREEFORALL = 0,
+		BACKSTAB = 1,
 	}
 }
 
@@ -63,11 +67,12 @@ function stateMultiplayer:onLoad( uplink, ... )
 	assert(uplink)
 	assert(not self.uplink)
 	self.uplink = uplink
-	self.votingMode = self.MISSION_VOTING.HOSTDECIDES
 	self.screen = mui.createScreen( "hud-multiplayer" )
 	self.screen:setPriority( 1000000 )
 	mui.activateScreen( self.screen )
 	self:updatePlayerList()
+	self.focusedPlayerIndex = 0
+	self.playerCount = 1
 	
 	return uplink:onLoad(self, ...)
 end
@@ -84,6 +89,7 @@ function stateMultiplayer:onUnload(  )
 	self.campaign = nil
 	self.upgradeHistory = nil
 	self.missionVotes = nil
+	self.chessTimers = nil
 	self.autoClose = nil
 	self.showPlayerList = nil
 	self.userName = nil
@@ -116,6 +122,10 @@ function stateMultiplayer:updatePlayerList()
 				widget.binder.txt:setText( client.userName )
 			end
 		end
+		
+		self.playerCount = 1 + #self.uplink.clients
+		self.uplink:send({plCoun = self.playerCount})
+		self:updateEndTurnButton()
 	else
 		self.screen.binder.playerListHeader:setVisible(false)
 		self.screen.binder.playerList:setVisible(false)
@@ -140,14 +150,16 @@ function stateMultiplayer:trackSimHistory()
 	-- Launching mission
 	log:write("Start tracking sim history")
 	self.onlineHistory = {}
+	self.chessTimers = {}
 	self.missionVotes = nil
-	self.upgradeHistory = nil 
+	self.upgradeHistory = nil
 end
 
 function stateMultiplayer:stopTrackingSimHistory()
 	-- Outside mission
 	log:write("Stop tracking sim history")
 	self.onlineHistory = nil
+	self.chessTimers = nil
 	self.upgradeHistory = {} 
 	self.missionVotes = {}
 end
@@ -169,12 +181,16 @@ function stateMultiplayer:mergeCampaign(tmerge)
 				onlineHistory = self.onlineHistory,
 				upgradeHistory = self.upgradeHistory,
 				missionVotes = self.missionVotes,
-				reqSockV = multiMod.COMPABILITY_VERSION,
+				reqSockV = self.COMPABILITY_VERSION,
 			})
 end
 
 function stateMultiplayer:loadCampaignGame(campaign)
 	self:restoreFMOD()
+	
+	if campaign.difficultyOptions.timeAttack and campaign.difficultyOptions.timeAttack > 0 and self.COMPABILITY_VERSION < 2.1 then
+		self.COMPABILITY_VERSION = 2.1
+	end
 	
 	if self.uplink then
 		if self:isHost() and campaign ~= self.campaign then
@@ -200,6 +216,10 @@ function stateMultiplayer:loadCampaignGame(campaign)
 			
 			self:updatePlayerList()
 			self.uplink:send(self:mergeCampaign())
+			
+			if self.onlineHistory then
+				self:focusFirstPlayer()
+			end
 		end
 	end
 end
@@ -220,6 +240,13 @@ function stateMultiplayer:onClientDisconnect( client, message )
 	if self.missionVotes then
 		self.missionVotes[client.clientIndex] = nil
 		self:checkVotes()
+	end
+	if self.chessTimers then
+		self.chessTimers[client.clientIndex] = nil
+		self:checkTimers()
+	end
+	if client.clientIndex == self.focusedPlayerIndex then
+		self:yield(client.clientIndex)
 	end
 end
 
@@ -295,10 +322,16 @@ function stateMultiplayer:receiveData(client,data,line)
 				-- Request from the host that we get a complete version of the history
 				-- We could attempt to fix this more subtly
 				log:write("Online history mismatch: Requesting full history")
-				self:send({reqOh=true})
+				self.uplink:send({reqOh=true})
 			end
 		elseif self:isClient() then
-			if data.agency then
+			if data.focus then
+				self.isFocusedPlayer = true
+				self:updateEndTurnButton()
+			elseif data.plCoun then
+				self.playerCount = data.plCoun
+				self:updateEndTurnButton()
+			elseif data.agency then
 				local thread = MOAICoroutine.new()
 				thread:run( self.setRemoteCampaign, self, data )
 				thread:resume()
@@ -315,6 +348,13 @@ function stateMultiplayer:receiveData(client,data,line)
 				end
 				self:startMissionImmediately( data.startM )
 			end
+		elseif data.yield then
+			if client.clientIndex == self.focusedPlayerIndex then
+				self:yield(client.clientIndex)
+			end
+		elseif data.chess and self.chessTimers then
+			self.chessTimers[client.clientIndex] = true
+			self:checkTimers()
 		elseif data.reqOh then
 			self.uplink:sendTo({onlineHistory = self.onlineHistory},client)
 		elseif type(data.voteM) == "number" then
@@ -355,6 +395,34 @@ function stateMultiplayer:sendChoice(choiceIdx, choice)
 	action.ohi = #self.onlineHistory
 	
 	self.uplink:send(action)
+end
+
+function stateMultiplayer:chessTimeOut()
+	if self:isHost() then
+		self.chessTimers[0] = true
+		self:checkTimers()
+	else
+		self.uplink:send( { chess = true } )
+	end
+end
+
+function stateMultiplayer:checkTimers()
+	local maxVotes = self.playerCount
+	for playerIndex, vote in pairs( self.chessTimers ) do
+		maxVotes = maxVotes - 1
+	end
+	
+	log:write(util.stringize(self.chessTimers))
+	
+	if maxVotes == 0 then
+		-- Weird, end turn during Time Attack is both a local and remote action
+		self.chessTimers = {}
+		local action = { name = "endTurnAction" }
+		self:sendAction( action )
+		if self:getCurrentGame() then
+			self:getCurrentGame():doRemoteAction(action)
+		end
+	end
 end
 
 function stateMultiplayer:unloadStates()
@@ -489,12 +557,123 @@ function stateMultiplayer:canTakeLocalAction( actionName, ... )
 	return true
 end
 
+function stateMultiplayer:yield(playerIndex)
+	self.isFocusedPlayer = false
+	
+	if self:isHost() then
+		local nextClient
+		local clientName
+		local previousFocusedPlayerIndex = self.focusedPlayerIndex or 0
+		
+		for i, client in ipairs(self.uplink.clients) do
+			if client.clientIndex > playerIndex and not (nextClient and client.clientIndex > nextClient.clientIndex)then
+				nextClient = client
+			end
+		end
+		
+		if nextClient then
+			self.focusedPlayerIndex = nextClient.clientIndex
+			self.uplink:sendTo({focus = true},nextClient)
+			clientName = nextClient.userName
+		else
+			self.focusedPlayerIndex = 0
+			self.isFocusedPlayer = true
+			clientName = self.userName
+		end
+	
+		local action = { name = "yieldTurnAction", clientName, previousFocusedPlayerIndex, self.focusedPlayerIndex }
+		
+		if not self:shouldYield() then
+			action.costly = true
+			local endTurnAction = { name = "endTurnAction" }
+		
+			self:sendAction( endTurnAction )
+			if self.game then
+				self.game:doRemoteAction( endTurnAction )
+			end
+		end
+		
+		self:sendAction( action )
+		if self.game then
+			self.game:doRemoteAction(action)
+		end
+	else
+		local action = { yield = true }
+		self.uplink:send(action)
+	end
+end
+
+function stateMultiplayer:shouldYield()
+	if not self.onlineHistory or self.gameMode ~= self.GAME_MODES.BACKSTAB then
+		return false
+	end
+
+	local yieldCount = self.playerCount - 1
+	
+	for i = #self.onlineHistory, 1, -1 do
+		local pastAction = self.onlineHistory[i]
+		if pastAction.name == "endTurnAction" or pastAction.name == "moveAction" or pastAction.costly then
+			break
+		end
+		
+		if pastAction.name == "yieldTurnAction" and ( pastAction[2] == 0 or self.uplink:findClient( pastAction[2] ) ) then
+			yieldCount = yieldCount - 1
+			if yieldCount <= 0 then
+				return false
+			end
+		end
+	end
+	
+	return yieldCount > 0
+end
+
+function stateMultiplayer:hasYielded()
+	if self.gameMode == self.GAME_MODES.BACKSTAB then
+		if self.game:isReplaying() and self.game.simHistory[#self.game.simHistory].name == "yieldTurnAction" then
+			return true
+		end
+		
+		return not self.isFocusedPlayer
+	end
+	
+	return false
+end
+
+function stateMultiplayer:focusFirstPlayer()
+	if self.gameMode ~= self.GAME_MODES.BACKSTAB then
+		return
+	end
+	
+	local r = math.random(1,self.playerCount)
+	log:write(string.format("Player %d goes first",r))
+	local client = self.uplink.clients[r]
+
+	if client then
+		self.isFocusedPlayer = false
+		self.focusedPlayerIndex = self.uplink.clients[r].clientIndex
+		self.uplink:sendTo({focus = true},client)
+		clientName = client.userName
+	else
+		self.focusedPlayerIndex = 0
+		self.isFocusedPlayer = true
+		clientName = self.userName
+	end
+	
+	local action = { name = "yieldTurnAction", costly = true, clientName, nil, self.focusedPlayerIndex }
+	
+	self:sendAction( action )
+	if self:getCurrentGame() then
+		self:getCurrentGame():doRemoteAction(action)	
+	end
+end
+
 function stateMultiplayer:voteMission( situationIndex, playerIndex )
 	if self.votingMode == self.MISSION_VOTING.HOSTDECIDES then
 		if self:isHost() and not playerIndex then
 			self:trackSimHistory()
 			local action = {startM = situationIndex, upAgency = self.campaign.agency}
 			self.uplink:send(action)
+			self:focusFirstPlayer()
 			return true
 		else
 			return false
@@ -525,7 +704,7 @@ function stateMultiplayer:checkVotes()
 	local usedVotes = {}
 	local voteMap = {}
 	local bestVote = 0
-	local maxVotes = self.uplink:getClientCount() + 1
+	local maxVotes = self.playerCount
 
 	for playerIndex, vote in pairs( self.missionVotes ) do
 		voteCount = voteCount + 1
@@ -553,7 +732,8 @@ function stateMultiplayer:checkVotes()
 			
 			situationIndex = usedVotes[math.random(#usedVotes)]
 		end
-	elseif self.votingMode == self.MISSION_VOTING.FREEFORALL then
+	--elseif self.votingMode == self.MISSION_VOTING.FREEFORALL then
+	else
 		situationIndex = usedVotes[1]
 	end
 	
@@ -562,6 +742,7 @@ function stateMultiplayer:checkVotes()
 		local action = {startM = situationIndex}
 		self.uplink:send(action)
 		self:startMissionImmediately( situationIndex )
+		self:focusFirstPlayer()
 	end
 end
 
@@ -631,6 +812,24 @@ function stateMultiplayer:stopFMOD()
 			isPlaying = function() return false end,
 			stopAllSounds = function() end,
 		}
+	end
+end
+
+function stateMultiplayer:updateEndTurnButton()
+	if self.game and self.game.hud and self.gameMode == self.GAME_MODES.BACKSTAB then
+		local btn = self.game.hud._screen.binder.endTurnBtn
+		
+		if self.isFocusedPlayer then
+			if self:shouldYield() then
+				btn:setText(STRINGS.MULTI_MOD.YIELD)
+			else
+				btn:setText(STRINGS.SCREENS.STR_3530899842) -- End Turn
+			end
+		elseif self.game.simCore and self.game.simCore.currentClientName then
+			btn:setText(string.format(STRINGS.MULTI_MOD.YIELDED_TO, self.game.simCore.currentClientName))
+		else
+			btn:setText(STRINGS.SCREENS.STR_3530899842) -- End Turn
+		end
 	end
 end
 

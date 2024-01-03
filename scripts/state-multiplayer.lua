@@ -612,6 +612,10 @@ function stateMultiplayer:shouldYield()
 	
 	for i = #self.onlineHistory, 1, -1 do
 		local pastAction = self.onlineHistory[i]
+		if not self.requireCostlyToYield and pastAction.name ~= "yieldTurnAction" then
+			log:write("costly not required, should yield")
+			break
+		end
 		if pastAction.name == "endTurnAction" or pastAction.name == "moveAction" or pastAction.costly then
 			break
 		end

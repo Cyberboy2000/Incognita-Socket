@@ -26,6 +26,7 @@ local function init( modApi )
 			multiMod.GAME_MODES.BACKSTAB,
 		}
 	})
+	modApi:addGenerationOption("requireCostlyToYield",STRINGS.MULTI_MOD.REQUIRE_COSTLY_TO_YIELD.NAME,STRINGS.MULTI_MOD.REQUIRE_COSTLY_TO_YIELD.TIP,{noUpdate=true})
 	modApi:addGenerationOption("votingMode",STRINGS.MULTI_MOD.MISSION_VOTING.NAME,STRINGS.MULTI_MOD.MISSION_VOTING.TIP,
 	{
 		noUpdate=true,
@@ -39,7 +40,7 @@ local function init( modApi )
 	})
 	
 	multiMod.DEFAULT_PORT = 27017
-	multiMod.MULTI_MOD_VERSION = 2.1
+	multiMod.MULTI_MOD_VERSION = 2.2
 	--multiMod.COMPABILITY_VERSION = 2 -- Moved to load!!!
 	multiMod.WERP_ADRESS = "werp.site"
 	multiMod.WERP_PORT = 31337
@@ -90,8 +91,13 @@ local function load( modApi, options, params )
 	if options["votingMode"] then
 		multiMod.votingMode = options["votingMode"].value
 	end
+	if options["requireCostlyToYield"] then
+		multiMod.requireCostlyToYield = options["requireCostlyToYield"].enabled
+	end
 	
-	if multiMod.gameMode ~= multiMod.GAME_MODES.FREEFORALL or (params and params.timeAttack and params.timeAttack > 0) then
+	if not multiMod.requireCostlyToYield and multiMod.gameMode == multiMod.GAME_MODES.BACKSTAB then
+		multiMod.COMPABILITY_VERSION = 2.2
+	elseif multiMod.gameMode ~= multiMod.GAME_MODES.FREEFORALL or (params and params.timeAttack and params.timeAttack > 0) then
 		multiMod.COMPABILITY_VERSION = 2.1
 	else
 		multiMod.COMPABILITY_VERSION = 2

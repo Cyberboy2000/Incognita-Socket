@@ -21,6 +21,11 @@ local MULTI_MOD = {
 			"HOST DECIDES",
 		}
 	},
+
+	REQUIRE_COSTLY_TO_YIELD = {
+		NAME = "REQUIRE COSTLY ACTIONS TO YIELD TURN",
+		TIP = "If enabled (default), yielding the turn in Backstab Protocols mode will only be available after taking costly actions, otherwise turn ends instead.\nIf disabled, taking any action will allow yielding the turn.",
+	},
 	
 	BUTTON_HOST = "HOST",
 	BUTTON_JOIN = "JOIN",

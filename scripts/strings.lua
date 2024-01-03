@@ -57,6 +57,11 @@ local MULTI_MOD = {
 	BACKSTAB_YIELD_SWIPE = "%s ACTIVITY",
 	YIELD = "YIELD TURN",
 	YIELDED_TO = "%s TURN",
+
+	YIELD_TOOLTIP_HEADER = "YIELD TURN",
+	YIELD_TOOLTIP = "Pass the turn to another player.",
+	YIELDED_TO_TOOLTIP_HEADER = "TURN YIELDED",
+	YIELDED_TO_TOOLTIP = "%s is currently taking their turn.",
 	
 	PANEL = {
 		TITLE = "Game Title",

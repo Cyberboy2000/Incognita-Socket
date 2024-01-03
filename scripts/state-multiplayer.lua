@@ -3,6 +3,7 @@ local version = include( "modules/version" )
 local mui = include("mui/mui")
 local mui_defs = include("mui/mui_defs")
 local mui_util = include("mui/mui_util")
+local mui_tooltip = include("mui/mui_tooltip")
 local cdefs = include( "client_defs" )
 local modalDialog = include( "states/state-modal-dialog" )
 local cheatmenu = include( "fe/cheatmenu" )
@@ -822,13 +823,25 @@ function stateMultiplayer:updateEndTurnButton()
 		if self.isFocusedPlayer then
 			if self:shouldYield() then
 				btn:setText(STRINGS.MULTI_MOD.YIELD)
+				local tooltip = mui_tooltip(STRINGS.MULTI_MOD.YIELD_TOOLTIP_HEADER, STRINGS.MULTI_MOD.YIELD_TOOLTIP, STRINGS.SCREENS.STR_194569200)
+				btn:setTooltip(tooltip)
 			else
 				btn:setText(STRINGS.SCREENS.STR_3530899842) -- End Turn
+				local tooltip = mui_tooltip(STRINGS.SCREENS.STR_1207454442, STRINGS.SCREENS.STR_610854735, STRINGS.SCREENS.STR_194569200)	-- default tooltip
+				btn:setTooltip(tooltip)
 			end
 		elseif self.game.simCore and self.game.simCore.currentClientName then
 			btn:setText(string.format(STRINGS.MULTI_MOD.YIELDED_TO, self.game.simCore.currentClientName))
+			local tooltip = mui_tooltip(
+				STRINGS.MULTI_MOD.YIELDED_TO_TOOLTIP_HEADER,
+				string.format(STRINGS.MULTI_MOD.YIELDED_TO_TOOLTIP, self.game.simCore.currentClientName),
+				nil		-- do not show hotkey, as it does nothing
+			)
+			btn:setTooltip(tooltip)
 		else
 			btn:setText(STRINGS.SCREENS.STR_3530899842) -- End Turn
+			local tooltip = mui_tooltip(STRINGS.SCREENS.STR_1207454442, STRINGS.SCREENS.STR_610854735, STRINGS.SCREENS.STR_194569200)	-- default tooltip
+			btn:setTooltip(tooltip)
 		end
 	end
 end

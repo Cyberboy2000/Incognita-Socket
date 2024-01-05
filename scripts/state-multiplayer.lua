@@ -327,6 +327,9 @@ function stateMultiplayer:receiveData(client,data,line)
 		elseif self:isClient() then
 			if data.focus then
 				self.isFocusedPlayer = true
+				if self.autoYield then
+					self:yield(self.focusedPlayerIndex)
+				end
 				self:updateEndTurnButton()
 			elseif data.plCoun then
 				self.playerCount = data.plCoun
@@ -573,7 +576,6 @@ function stateMultiplayer:yield(playerIndex)
 		
 		if nextClient then
 			self.focusedPlayerIndex = nextClient.clientIndex
-			self.uplink:sendTo({focus = true},nextClient)
 			clientName = nextClient.userName
 		else
 			self.focusedPlayerIndex = 0
@@ -596,6 +598,14 @@ function stateMultiplayer:yield(playerIndex)
 		self:sendAction( action )
 		if self.game then
 			self.game:doRemoteAction(action)
+		end
+		
+		if nextClient then
+			self.uplink:sendTo({focus = true},nextClient)
+		else
+			if self.autoYield then
+				self:yield(self.focusedPlayerIndex)
+			end
 		end
 	else
 		local action = { yield = true }
@@ -651,7 +661,6 @@ function stateMultiplayer:focusFirstPlayer()
 	if client then
 		self.isFocusedPlayer = false
 		self.focusedPlayerIndex = self.uplink.clients[r].clientIndex
-		self.uplink:sendTo({focus = true},client)
 		clientName = client.userName
 	else
 		self.focusedPlayerIndex = 0
@@ -664,6 +673,14 @@ function stateMultiplayer:focusFirstPlayer()
 	self:sendAction( action )
 	if self:getCurrentGame() then
 		self:getCurrentGame():doRemoteAction(action)	
+	end
+
+	if client then
+		self.uplink:sendTo({focus = true},client)
+	else
+		if self.autoYield then
+			self:yield(self.focusedPlayerIndex)
+		end
 	end
 end
 
@@ -818,17 +835,21 @@ end
 function stateMultiplayer:updateEndTurnButton()
 	if self.game and self.game.hud and self.gameMode == self.GAME_MODES.BACKSTAB then
 		local btn = self.game.hud._screen.binder.endTurnBtn
-		
+		local suffix = ""
+
+		if self.autoYield then
+			suffix = STRINGS.MULTI_MOD.AUTOYIELDING_SUFFIX
+		end
 		if self.isFocusedPlayer then
 			if self:shouldYield() then
-				btn:setText(STRINGS.MULTI_MOD.YIELD)
+				btn:setText(STRINGS.MULTI_MOD.YIELD .. suffix)
 			else
-				btn:setText(STRINGS.SCREENS.STR_3530899842) -- End Turn
+				btn:setText(STRINGS.SCREENS.STR_3530899842 .. suffix) -- End Turn
 			end
 		elseif self.game.simCore and self.game.simCore.currentClientName then
-			btn:setText(string.format(STRINGS.MULTI_MOD.YIELDED_TO, self.game.simCore.currentClientName))
+			btn:setText(string.format(STRINGS.MULTI_MOD.YIELDED_TO, self.game.simCore.currentClientName) .. suffix)
 		else
-			btn:setText(STRINGS.SCREENS.STR_3530899842) -- End Turn
+			btn:setText(STRINGS.SCREENS.STR_3530899842 .. suffix) -- End Turn
 		end
 	end
 end

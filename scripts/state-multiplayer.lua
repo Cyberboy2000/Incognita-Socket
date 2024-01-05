@@ -581,7 +581,7 @@ function stateMultiplayer:yield(playerIndex)
 			clientName = self.userName
 		end
 	
-		local action = { name = "yieldTurnAction", clientName, previousFocusedPlayerIndex, self.focusedPlayerIndex, self.isFocusedPlayer }
+		local action = { name = "yieldTurnAction", clientName, previousFocusedPlayerIndex, self.focusedPlayerIndex }
 		
 		if not self:shouldYield() then
 			action.costly = true
@@ -659,7 +659,7 @@ function stateMultiplayer:focusFirstPlayer()
 		clientName = self.userName
 	end
 	
-	local action = { name = "yieldTurnAction", costly = true, clientName, nil, self.focusedPlayerIndex, self.isFocusedPlayer }
+	local action = { name = "yieldTurnAction", costly = true, clientName, nil, self.focusedPlayerIndex }
 	
 	self:sendAction( action )
 	if self:getCurrentGame() then

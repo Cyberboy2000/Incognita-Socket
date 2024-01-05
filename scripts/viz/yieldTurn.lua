@@ -2,25 +2,19 @@ local util = include( "client_util" )
 local cdefs = include( "client_defs" )
 local rig_util = include( "gameplay/rig_util" )
 
-local function stopTitleSwipe(hud, isFocusedPlayer)
-	if not isFocusedPlayer then
-		MOAIFmodDesigner.playSound( "SpySociety/HUD/gameplay/turnswitch_out" )
-	end
+local function stopTitleSwipe(hud)
+	MOAIFmodDesigner.playSound( "SpySociety/HUD/gameplay/turnswitch_out" )
     rig_util.waitForAnim(  hud._screen.binder.swipe.binder.anim:getProp(), "pst" )
     hud._screen.binder.swipe:setVisible(false)
 end
 
-local function startTitleSwipe( hud, swipeText,color,sound,showCorpTurn,turn,isFocusedPlayer)
+local function startTitleSwipe( hud, swipeText,color,sound,showCorpTurn,turn)
 	
 	MOAIFmodDesigner.playSound( sound )
 	hud._screen.binder.swipe:setVisible(true)
 	hud._screen.binder.swipe.binder.anim:setColor(color.r, color.g, color.b, color.a )	
 	hud._screen.binder.swipe.binder.anim:setAnim("pre")
-	if isFocusedPlayer then
-		MOAIFmodDesigner.playSound( "SpySociety/HUD/voice/level1/alarmvoice_warning" )
-	else
-		MOAIFmodDesigner.playSound( "SpySociety/HUD/gameplay/turnswitch_in" )
-	end
+	MOAIFmodDesigner.playSound( "SpySociety/HUD/gameplay/turnswitch_in" )
 
 	hud._screen.binder.swipe.binder.txt:spoolText(string.format(swipeText))	
 	hud._screen.binder.swipe.binder.txt:setColor(color.r, color.g, color.b, color.a )	
@@ -49,16 +43,9 @@ local function wait( event, evType, evData, boardRig, hud, vizThread )
 	
 	local turn = math.ceil( (boardRig:getSim():getTurnCount() + 1) / 2)
 
-	local color
-
-	if evData.isFocusedPlayer then
-		color = {r=244/255, g=255/255, b=120/255, a=1}
-	else
-		color = {r=140/255, g=255/255, b=255/255, a=1}
-	end
-	startTitleSwipe( hud, txt, color, cdefs.SOUND_HUD_GAME_ACTIVITY_AGENT, false, turn, evData.isFocusedPlayer )
+	startTitleSwipe( hud, txt, {r=140/255,g=255/255 ,b=255/255,a=1}, cdefs.SOUND_HUD_GAME_ACTIVITY_AGENT, false, turn)
 	rig_util.wait(30)		
-	stopTitleSwipe( hud, evData.isFocusedPlayer )
+	stopTitleSwipe( hud )
 end
 
 return wait

@@ -57,6 +57,7 @@ local MULTI_MOD = {
 	BACKSTAB_YIELD_SWIPE = "%s ACTIVITY",
 	YIELD = "YIELD TURN",
 	YIELDED_TO = "%s TURN",
+	AUTOYIELDING_SUFFIX = " <c:F0FF78>(A/Y)</c>",
 	
 	PANEL = {
 		TITLE = "Game Title",

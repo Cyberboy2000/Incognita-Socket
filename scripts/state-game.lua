@@ -34,12 +34,22 @@ function game:doAction( actionName, ... )
 	local canTakeAction = multiMod:canTakeAction( actionName, ... )
 	local canLocallyTakeAction = multiMod:canTakeLocalAction( actionName, ... )
 	
+	if multiMod.gameMode == multiMod.GAME_MODES.BACKSTAB and actionName == "endTurnAction" then
+		if multiMod:hasYielded() then
+			if multiMod.autoYield then
+				multiMod.autoYield = false
+			else
+				multiMod.autoYield = true
+			end
+			multiMod:updateEndTurnButton()
+			return
+		else
+			return multiMod:yield(0)
+		end
+	end
+
 	if multiMod:hasYielded() and actionName ~= "mapPinAction" then
 		return
-	end
-	
-	if multiMod.gameMode == multiMod.GAME_MODES.BACKSTAB and actionName == "endTurnAction" and not multiMod:hasYielded() then
-		return multiMod:yield(0)
 	end
 	
 	if multiMod:getUplink() and self.syncedChessTimer then
@@ -84,6 +94,7 @@ function game:doRemoteAction(action)
 		local actionName = action.name
 		
 		if actionName == "endTurnAction" then
+			multiMod.autoYield = false
 			if self.hud then
 				self.hud:abortChoiceDialog()
 				self.hud:hideItemsPanel()
@@ -213,6 +224,7 @@ function game:onLoad( ... )
 	oldOnLoad( self, ... )
 	
 	if multiMod:getUplink() then
+		multiMod.autoYield = false
 		multiMod:startGame(self)
 		
 		local oldUpdateTimeAttack = self.updateTimeAttack

@@ -573,7 +573,6 @@ function stateMultiplayer:yield(playerIndex)
 		
 		if nextClient then
 			self.focusedPlayerIndex = nextClient.clientIndex
-			self.uplink:sendTo({focus = true},nextClient)
 			clientName = nextClient.userName
 		else
 			self.focusedPlayerIndex = 0
@@ -596,6 +595,10 @@ function stateMultiplayer:yield(playerIndex)
 		self:sendAction( action )
 		if self.game then
 			self.game:doRemoteAction(action)
+		end
+		
+		if nextClient then
+			self.uplink:sendTo({focus = true},nextClient)
 		end
 	else
 		local action = { yield = true }
@@ -651,7 +654,6 @@ function stateMultiplayer:focusFirstPlayer()
 	if client then
 		self.isFocusedPlayer = false
 		self.focusedPlayerIndex = self.uplink.clients[r].clientIndex
-		self.uplink:sendTo({focus = true},client)
 		clientName = client.userName
 	else
 		self.focusedPlayerIndex = 0
@@ -664,6 +666,10 @@ function stateMultiplayer:focusFirstPlayer()
 	self:sendAction( action )
 	if self:getCurrentGame() then
 		self:getCurrentGame():doRemoteAction(action)	
+	end
+
+	if client then
+		self.uplink:sendTo({focus = true},client)
 	end
 end
 

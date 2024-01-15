@@ -57,6 +57,9 @@ local MULTI_MOD = {
 	BACKSTAB_YIELD_SWIPE = "%s ACTIVITY",
 	YIELD = "YIELD TURN",
 	YIELDED_TO = "%s TURN",
+
+	NOT_YOUR_TURN_TITLE = "Not your turn",
+	NOT_YOUR_TURN_SUBTEXT = "%s is currently taking actions.",
 	
 	PANEL = {
 		TITLE = "Game Title",

@@ -35,6 +35,12 @@ function game:doAction( actionName, ... )
 	local canLocallyTakeAction = multiMod:canTakeLocalAction( actionName, ... )
 	
 	if multiMod:hasYielded() and actionName ~= "mapPinAction" then
+		MOAIFmodDesigner.playSound( "SpySociety/HUD/voice/level1/alarmvoice_warning" )
+		self.hud:showWarning(
+			STRINGS.MULTI_MOD.NOT_YOUR_TURN_TITLE,
+			{r=1,g=1,b=1,a=1},
+			string.format(STRINGS.MULTI_MOD.NOT_YOUR_TURN_SUBTEXT, self.simCore.currentClientName)
+		)
 		return
 	end
 	

@@ -68,7 +68,7 @@ end
 
 function game:onPlaybackDone(...)
 	oldOnPlaybackDone(self,...)
-	multiMod:updateEndTurnButton()
+	multiMod:updateHudButtons()
 end
 
 function game:doRemoteAction(action)
@@ -190,7 +190,7 @@ function game:fromOnlineHistory(onlineHistory)
 
 		util.fullGC()
 	else
-		multiMod:updateEndTurnButton()
+		multiMod:updateHudButtons()
 	end
 end
 

@@ -125,7 +125,7 @@ function stateMultiplayer:updatePlayerList()
 		
 		self.playerCount = 1 + #self.uplink.clients
 		self.uplink:send({plCoun = self.playerCount})
-		self:updateEndTurnButton()
+		self:updateHudButtons()
 	else
 		self.screen.binder.playerListHeader:setVisible(false)
 		self.screen.binder.playerList:setVisible(false)
@@ -327,10 +327,10 @@ function stateMultiplayer:receiveData(client,data,line)
 		elseif self:isClient() then
 			if data.focus then
 				self.isFocusedPlayer = true
-				self:updateEndTurnButton()
+				self:updateHudButtons()
 			elseif data.plCoun then
 				self.playerCount = data.plCoun
-				self:updateEndTurnButton()
+				self:updateHudButtons()
 			elseif data.agency then
 				local thread = MOAICoroutine.new()
 				thread:run( self.setRemoteCampaign, self, data )
@@ -815,6 +815,11 @@ function stateMultiplayer:stopFMOD()
 	end
 end
 
+function stateMultiplayer:updateHudButtons()
+	self:updateEndTurnButton()
+	self:updateRewindButton()
+end
+
 function stateMultiplayer:updateEndTurnButton()
 	if self.game and self.game.hud and self.gameMode == self.GAME_MODES.BACKSTAB then
 		local btn = self.game.hud._screen.binder.endTurnBtn
@@ -830,6 +835,13 @@ function stateMultiplayer:updateEndTurnButton()
 		else
 			btn:setText(STRINGS.SCREENS.STR_3530899842) -- End Turn
 		end
+	end
+end
+
+function stateMultiplayer:updateRewindButton()
+	if self.game and self.game.hud and self.gameMode == self.GAME_MODES.BACKSTAB then
+		local btn = self.game.hud._screen.binder.rewindBtn
+		btn:setVisible(self.isFocusedPlayer)
 	end
 end
 

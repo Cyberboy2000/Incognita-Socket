@@ -841,7 +841,7 @@ end
 function stateMultiplayer:updateRewindButton()
 	if self.game and self.game.hud and self.gameMode == self.GAME_MODES.BACKSTAB then
 		local btn = self.game.hud._screen.binder.rewindBtn
-		btn:setVisible(self.isFocusedPlayer)
+		btn:setDisabled(not self.isFocusedPlayer)
 	end
 end
 

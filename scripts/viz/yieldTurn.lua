@@ -3,7 +3,9 @@ local cdefs = include( "client_defs" )
 local rig_util = include( "gameplay/rig_util" )
 
 local function stopTitleSwipe(hud)
-	MOAIFmodDesigner.playSound( "SpySociety/HUD/gameplay/turnswitch_out" )
+	if not multiMod.isFocusedPlayer then
+		MOAIFmodDesigner.playSound( "SpySociety/HUD/gameplay/turnswitch_out" )
+	end
     rig_util.waitForAnim(  hud._screen.binder.swipe.binder.anim:getProp(), "pst" )
     hud._screen.binder.swipe:setVisible(false)
 end
@@ -14,7 +16,11 @@ local function startTitleSwipe( hud, swipeText,color,sound,showCorpTurn,turn)
 	hud._screen.binder.swipe:setVisible(true)
 	hud._screen.binder.swipe.binder.anim:setColor(color.r, color.g, color.b, color.a )	
 	hud._screen.binder.swipe.binder.anim:setAnim("pre")
-	MOAIFmodDesigner.playSound( "SpySociety/HUD/gameplay/turnswitch_in" )
+	if multiMod.isFocusedPlayer then
+		MOAIFmodDesigner.playSound( "SpySociety/HUD/voice/level1/alarmvoice_warning" )
+	else
+		MOAIFmodDesigner.playSound( "SpySociety/HUD/gameplay/turnswitch_in" )
+	end
 
 	hud._screen.binder.swipe.binder.txt:spoolText(string.format(swipeText))	
 	hud._screen.binder.swipe.binder.txt:setColor(color.r, color.g, color.b, color.a )	
@@ -43,7 +49,14 @@ local function wait( event, evType, evData, boardRig, hud, vizThread )
 	
 	local turn = math.ceil( (boardRig:getSim():getTurnCount() + 1) / 2)
 
-	startTitleSwipe( hud, txt, {r=140/255,g=255/255 ,b=255/255,a=1}, cdefs.SOUND_HUD_GAME_ACTIVITY_AGENT, false, turn)
+	local color
+	if multiMod.isFocusedPlayer then
+		color = {r=244/255, g=255/255, b=120/255, a=1}
+	else
+		color = {r=140/255, g=255/255, b=255/255, a=1}
+	end
+	startTitleSwipe( hud, txt, color, cdefs.SOUND_HUD_GAME_ACTIVITY_AGENT, false, turn )
+
 	rig_util.wait(30)		
 	stopTitleSwipe( hud )
 end

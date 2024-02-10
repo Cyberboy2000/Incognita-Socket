@@ -183,9 +183,9 @@ function game:fromOnlineHistory(onlineHistory)
 		end
 
 		if multiMod.gameMode == multiMod.GAME_MODES.BACKSTAB and self.simHistoryIdx == 0 then
-        	local level = include( "sim/level" )
-            self:dispatchScriptEvent( level.EV_UI_INITIALIZED )
-        end
+			local level = include( "sim/level" )
+			self:dispatchScriptEvent( level.EV_UI_INITIALIZED )
+		end
 
 		self.boardRig = boardrig( self.layers, self.levelData, self )
 		self.hud = hud.createHud( self )
